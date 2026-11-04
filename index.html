@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="fa" translate="no" class="notranslate">
+<head>
+<meta charset="UTF-8">
+<meta name="google" content="notranslate">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HMI Stacker</title>
+<link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet" media="print" onload="this.media='all'">
+<style>
+html{margin:0;padding:0}body{margin:0;padding:0;background:#222;overflow-x:hidden;font-family:Vazirmatn,Tahoma,Arial,sans-serif}
+.panel{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;position:relative;display:block;width:1000px;margin:0;padding:0;transform-origin:0 0;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.panel img{width:1000px;display:block}
+button.z{position:absolute;padding:0;cursor:pointer;z-index:50;font-family:inherit;box-sizing:border-box;background:transparent!important;border:none!important;color:transparent!important;font-size:0!important;box-shadow:none!important;outline:none!important}
+.debug-on button.z{background:rgba(255,220,0,.30)!important;border:1px solid #ffdc00!important}
+.debug-on button.z.go{background:rgba(40,120,255,.35)!important;border-color:#2878ff!important}
+.pick button.z{pointer-events:none}
+.panel.labels-on img{filter:blur(2.5px) brightness(1.2) opacity(.2);transition:filter .15s}
+.hmi-label{white-space:pre-line;position:absolute;box-sizing:border-box;display:flex;align-items:center;justify-content:center;text-align:center;direction:rtl;overflow:hidden;padding:1px 3px;background:none;border:0;color:#fff;-webkit-text-stroke:3px #000;paint-order:stroke fill;text-shadow:0 0 3px #000,0 0 3px #000,1px 1px 2px #000,-1px -1px 2px #000;font-family:Vazirmatn,Tahoma,Arial,sans-serif;font-weight:700;line-height:1.2;z-index:300;pointer-events:none}
+.pick .hmi-label{display:none}
+#liveClock{position:absolute;z-index:40;pointer-events:none;box-sizing:border-box;display:flex;align-items:center;justify-content:center;white-space:nowrap;font-family:Consolas,Menlo,monospace;font-weight:600;letter-spacing:.5px;direction:ltr}
+.panel.labels-on #liveClock{opacity:0}
+#coordBox{display:none;position:fixed;top:6px;right:6px;z-index:5000;background:#000;color:#3f3;font:14px monospace;padding:6px 10px;border:1px solid #3f3;border-radius:6px;pointer-events:none;max-width:90vw;direction:ltr;white-space:pre-wrap}
+#msg{display:none;position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:3000;background:rgba(30,37,44,.95);color:#f1f5f8;border:1px solid rgba(101,200,232,.6);border-radius:10px;padding:8px 14px;font-size:13px;max-width:90vw;direction:rtl;text-align:center}
+.hmi-tooltip{position:fixed;display:none;width:250px;max-width:calc(100vw - 10px);box-sizing:border-box;padding:10px 14px;background:rgba(30,37,44,.88);color:#f1f5f8;border:1px solid rgba(101,200,232,.6);border-radius:12px;direction:rtl;text-align:right;font-family:Vazirmatn,Tahoma,Arial,sans-serif;font-size:17px;line-height:1.6;box-shadow:0 10px 30px rgba(0,0,0,.6),0 0 15px rgba(101,200,232,.15);z-index:2000;pointer-events:none;white-space:pre-line;backdrop-filter:blur(8px)}
+.hmi-tooltip.wide{width:390px}
+.hmi-tooltip-title{display:block;color:#65c8e8;font-weight:800;font-size:18px;margin-bottom:6px;padding-bottom:5px;border-bottom:1px solid rgba(101,200,232,.3);direction:ltr;text-align:left;overflow-wrap:anywhere;letter-spacing:.5px}
+.hmi-tooltip-text{display:block;color:#e8eef3;font-size:16px;font-weight:600;line-height:1.7;overflow-wrap:anywhere}
+.hmi-tooltip-hint{display:block;margin-top:6px;color:#9fb3c0;font-size:13px}
+@media (max-width:600px){.hmi-tooltip{width:200px;padding:7px 10px;font-size:13.5px;line-height:1.5;border-radius:10px}.hmi-tooltip.wide{width:300px}.hmi-tooltip-title{font-size:14.5px;margin-bottom:4px;padding-bottom:4px}.hmi-tooltip-text{font-size:13.5px;line-height:1.55}.hmi-tooltip-hint{font-size:11.5px}}
+.tap{position:fixed;width:46px;height:46px;margin:-23px 0 0 -23px;border-radius:50%;border:3px solid #65c8e8;background:rgba(101,200,232,.35);box-shadow:0 0 12px rgba(101,200,232,.6);pointer-events:none;z-index:6000;animation:tapPulse .65s ease-out forwards}
+@keyframes tapPulse{from{transform:scale(.4);opacity:1}to{transform:scale(1.7);opacity:0}}
+</style>
+</head>
+<body>
+<div id="fitWrap" style="width:100%;margin:0;padding:0;overflow:hidden;line-height:0">
+<div class="panel" id="panel"><img id="panelImage" alt="HMI Stacker"></div>
+</div>
+<div id="coordBox"></div>
+<div id="msg"></div>
+<div id="hmiTooltip" class="hmi-tooltip"><span id="ttTitle" class="hmi-tooltip-title"></span><span id="ttText" class="hmi-tooltip-text"></span><span id="ttHint" class="hmi-tooltip-hint"></span></div>
+
+<script>
+/* حالت‌ها: آدرس را با ?debug باز کن تا دکمه‌ها و مختصات دیده شوند (آبی = دکمه‌ای که به صفحه دیگر می‌رود).
+   با ?pick دو گوشه یک قسمت را کلیک کن تا خط آماده‌ی دکمه کپی شود. */
+const SHOW_BUTTONS = /[?&](debug|pick)\b/.test(location.search), PICK = /[?&]pick\b/.test(location.search);
+
+/* ===== صفحه‌ها =====
+   هر دکمه: [x, y, عرض, ارتفاع, "اسم انگلیسی", "توضیح فارسی", "صفحه مقصد"]
+   مختصات روی عکس ۱۰۰۰ پیکسلی است (همان که با ?debug می‌بینی).
+   مقصد: کلید یک صفحه (مثل "belts")، یا "$back" برای برگشت. اگر مقصد نباشد فقط توضیح نشان می‌دهد. */
+const PAGES = {
+  "layout": { title: "Home", image: ["images/LAYOUT", "images/LAYOTE"], buttons: [
+    [255, 0, 490, 60, "AMOTEK", "لوگو و نام سازنده دستگاه (AMOTEK)."],
+    [168, 75, 327, 65, "ST8B-2S s.n. 134700", "مدل دستگاه (ST8B-2S)، شماره سریال (134700) و سایز فعال فعلی."],
+    [637, 67, 175, 44, "Clock", "ساعت دستگاه. با کلیک، صفحه تنظیم ساعت (Setup time) باز می‌شود.", "setup-time"],
+    [840, 5, 150, 145, "QR code", "کد QR دستگاه."],
+    [5, 152, 192, 45, "Log In", "ورود کاربر: رفتن به صفحه ورود (Login).", "login"],
+    [408, 152, 187, 45, "System", "اطلاعات سیستم: شمای استکر با نمایش وضعیت قسمت‌ها.", "system-info"],
+    [808, 150, 189, 45, "Menu >>", "منوی اصلی: رفتن به صفحه منو با همه بخش‌ها.", "main-menu"],
+    [207, 198, 178, 30, "Bg B Fault", "وضعیت بگر B: خطا (Fault)."],
+    [650, 198, 178, 30, "Bg A running", "وضعیت بگر A: در حال کار."],
+    [20, 230, 965, 245, "Machine layout", "شمای ساده‌شده استکر و بگرها؛ قسمت‌های روشن یا رنگی وضعیت بخش‌ها را نشان می‌دهند."],
+    [0, 478, 200, 42, "Level: 0", "سطح دسترسی کاربر ورودی (۰ یعنی کسی وارد نشده) و علامت قفل."],
+    [375, 485, 85, 30, "User", "نام کاربری که وارد شده است."],
+    [662, 485, 328, 30, "Actual Speed", "سرعت واقعی فعلی دستگاه (مثلاً ۸۳۵)."],
+    [0, 522, 998, 146, "Alarm message", "بخش پیام آلارم: فقط چند آلارم فعال را (شماره و متن) نشان می‌دهد؛ برای دیدن همه آلارم‌ها از منوی اصلی، «Alarms on» را بزن."],
+    [890, 672, 100, 47, "Square button", "دکمه مربع: رفتن به منوی اصلی.", "main-menu"],
+    [0, 672, 200, 47, "Back", "دکمه بازگشت به صفحه قبل", "$back"],
+    [457, 672, 85, 47, "Home button", "دکمه خانه (دایره): برگشت به صفحه اصلی (لایوت).", "layout"],
+  ]},
+  "main-menu": { title: "Main menu", image: "images/MAIN MENU", buttons: [
+    [-3, -3, 330, 122, "Size selection", "انتخاب سایز: انتخاب سایز کاری دستگاه.", "size-selection"],
+    [332, -3, 330, 122, "Home", "هوم: بردن زنجیر پره‌های استکر به حالت مرجع.", "home-homing"],
+    [668, -3, 333, 122, "Alarms on", "آلارم‌های فعال: آلارم‌هایی که همین الان فعال‌اند؛ با فلش >> کل تاریخچه باز می‌شود.", "alarms-on"],
+    [-3, 130, 330, 122, "General data", "اطلاعات عمومی استکر.", "general-data"],
+    [332, 130, 330, 122, "Operation mode", "حالت کار دستگاه: شبیه‌سازی، تخلیه محصول، فعال/غیرفعال کردن بگرها و ...", "operation-mode"],
+    [668, 130, 333, 122, "Panel function", "عملکرد پنل: پشتیبان‌گیری، بازیابی، ورود و تنظیم ساعت.", "panel-function"],
+    [-3, 267, 330, 122, "Manual operations", "عملیات دستی: حرکت دستی پوشر و تست لامپ.", "manual-operations"],
+    [332, 267, 330, 122, "Valves control", "کنترل شیرها: روشن و خاموش دستی شیرهای باد.", "valves-control"],
+    [668, 267, 333, 122, "Language", "انتخاب زبان پنل.", "language"],
+    [-3, 406, 330, 122, "System info", "اطلاعات سیستم: شمای استکر.", "system-info"],
+    [332, 406, 330, 122, "Size data", "داده‌های سایز: پارامترهای هر سایز (ورودی استکر، تعداد استک، پوشر خروجی و پارامترهای عمومی).", "size-data"],
+    [668, 406, 333, 122, "I/O Check", "بررسی ورودی و خروجی‌های PLC.", "io-check"],
+    [-3, 544, 330, 122, "'U' pos. BGA pusher", "موقعیت U پوشر یا جاروبک بسته‌بندی (بگر).", "u-pos-bga-pusher"],
+    [332, 544, 330, 122, "Infeed prod.detction", "تشخیص و ثبت محصول ورودی.", "infeed-prod-detection"],
+    [-3, 671, 203, 57, "Back", "دکمه بازگشت به صفحه قبل", "$back"],
+    [459, 674, 86, 55, "Home button", "دکمه خانه (دایره): برگشت به صفحه اصلی (لایوت).", "layout"],
+    [896, 674, 106, 55, "Square button", "دکمه مربع: منوی اصلی (همین صفحه)."],
+  ]},
+  "size-selection": { title: "Size selection", image: "images/SIZE SELECTION", buttons: [
+    [-4, 94, 227, 69, "Stacker infeed", "رفتن به پارامترهای ورودی استکر.", "stacker-infeed"],
+    [-4, 170, 227, 69, "Stack count", "رفتن به پارامترهای تعداد استک.", "stack-count"],
+    [-4, 246, 227, 69, "Outfeed pusher", "رفتن به پارامترهای پوشر خروجی.", "outfeed-pusher"],
+    [-4, 323, 227, 70, "General parameters", "پارامترهای عمومی سایز: رفتن به صفحه پارامترهای عمومی (زنجیر پره‌های استکر).", "general-parameters"],
+    [232, 94, 630, 438, "Size list", "فهرست سایزهای ذخیره‌شده. با لمس یک ردیف، آن سایز انتخاب می‌شود (ردیف سیاه = انتخاب‌شده)."],
+    [872, 94, 72, 181, "Scroll arrows", "فلش‌های بالا و پایین برای حرکت در فهرست سایزها."],
+    [207, 543, 603, 114, "WORKING SIZE", "سایز در حال کار: سایزی که الان روی دستگاه فعال است."],
+    [-4, 575, 200, 76, "Size management", "مدیریت سایز: رفتن به صفحه مدیریت سایزها (ویرایش نام، کپی، حذف، ساخت سایز جدید و پشتیبان‌گیری).", "size-management"],
+    [826, 576, 168, 81, "SEND -->PLC", "ارسال سایز انتخاب‌شده به PLC تا روی دستگاه اعمال شود."],
+    [-4, 671, 203, 57, "Back", "دکمه بازگشت به صفحه قبل", "$back"],
+    [459, 673, 86, 55, "Home button", "دکمه خانه (دایره): برگشت به صفحه اصلی (لایوت).", "layout"],
+    [896, 673, 106, 55, "Square button", "دکمه مربع: رفتن به منوی اصلی.", "main-menu"],
+    [204, 671, 213, 57, "Login required", "قفل: برای تغییر مقدارها باید با سطح دسترسی مناسب وارد (Login) شوی. تا وقتی وارد نشده‌ای، پنل فقط نمایش می‌دهد."],
+  ]},
+  "size-management": { title: "Size management", image: "images/SIZE MANAGEMENT", buttons: [
+    [0, 0, 1000, 51, "Size selection", "عنوان صفحه: انتخاب سایز؛ مدیریت فهرست سایزهای ذخیره‌شده."],
+    [26, 61, 231, 44, "WORKING SIZE", "سایز در حال کار: سایزی که الان روی دستگاه فعال است."],
+    [275, 58, 556, 49, "Working size name", "نام سایز در حال کار (سایز فعال روی دستگاه)."],
+    [850, 61, 150, 70, "Edit name", "ویرایش نام: تغییر نام سایز انتخاب‌شده (سطح دسترسی PL.2)."],
+    [6, 123, 625, 432, "Size list", "فهرست سایزهای ذخیره‌شده. با لمس یک ردیف، آن سایز انتخاب می‌شود (ردیف سیاه = انتخاب‌شده)."],
+    [637, 120, 72, 159, "Scroll arrows", "فلش‌های بالا و پایین برای حرکت در فهرست سایزها."],
+    [749, 145, 230, 210, "Copy the active RECIPE", "کپی سایز فعال: سایز فعال روی PLC روی سایز انتخاب‌شده کپی می‌شود."],
+    [792, 276, 150, 70, "Copy from PLC", "کپی از PLC: مقدارهای سایز فعال PLC را روی سایز انتخاب‌شده می‌نویسد (سطح دسترسی PL.3)."],
+    [785, 364, 157, 70, "Delete Recipe", "حذف سایز: سایز انتخاب‌شده را از فهرست پاک می‌کند (سطح دسترسی PL.3)."],
+    [749, 450, 230, 200, "Create a new RECIPE", "ساخت سایز جدید: یک سایز تازه با کپی سایز انتخاب‌شده ساخته می‌شود."],
+    [792, 584, 150, 65, "New Recipe", "سایز جدید: ساخت سایز جدید با کپی سایز انتخاب‌شده (سطح دسترسی PL.2)."],
+    [0, 572, 228, 77, "Sizes backup", "پشتیبان‌گیری از سایزها: ذخیره‌ی فهرست سایزها."],
+    [0, 672, 196, 50, "Back", "دکمه بازگشت به صفحه قبل", "$back"],
+    [199, 672, 208, 50, "Login required", "قفل: برای تغییر مقدارها باید با سطح دسترسی مناسب وارد (Login) شوی. تا وقتی وارد نشده‌ای، پنل فقط نمایش می‌دهد."],
+    [456, 672, 84, 50, "Home button", "دکمه خانه (دایره): برگشت به صفحه اصلی (لایوت).", "layout"],
+    [905, 672, 95, 50, "Square button", "دکمه مربع: رفتن به منوی اصلی.", "main-menu"],
+  ]},
+  "stacker-infeed": { title: "Stacker infeed", image: "images/STACKER INFEED", buttons: [
+    [-8, -8, 1015, 60, "Stacker infeed", "عنوان صفحه: ورودی استکر؛ فلش‌های << و >> برای رفتن به صفحه قبل و بعد"],
+    [3, 57, 266, 62, "SAVE DATA", "ذخیره اطلاعات: مقدارهای وارد‌شده را برای این سایز در پنل ذخیره می‌کند."],
+    [722, 55, 269, 69, "SEND -->PLC", "ارسال به PLC: مقدارها را به کنترلر می‌فرستد تا روی دستگاه اعمال شوند."],
+    [3, 133, 411, 81, "STORED SIZE", "سایز ذخیره‌شده: نام سایزی که مقدارهای ستون خاکستری مال آن است."],
+    [579, 133, 413, 81, "WORKING SIZE", "سایز در حال کار: نام سایزی که الان روی دستگاه فعال است."],
+    [4, 221, 676, 44, "Twist belt product pitch (mm)", "فاصله (گام) محصولات روی تسمه استکر، بر حسب میلی‌متر."],
+    [4, 272, 676, 44, "Minimum infeed speed for blower on (Ppm)", "حداقل سرعت ورودی (محصول در دقیقه) که از آن به بعد دمنده روشن می‌شود."],
+    [4, 323, 676, 44, "Advance start paddle chain IN (mm)", "پیش‌انداز شروع حرکت زنجیر پره‌های استکر ورودی، بر حسب میلی‌متر."],
+    [4, 373, 676, 44, "Paddle chain in phase offset position (%)", "آفست فاز زنجیر پره‌های استکر ورودی، بر حسب درصد."],
+    [168, 422, 664, 71, "Offset bar", "نوار نمایش مقدار آفست (۰ تا ۱۰۰ درصد)."],
+    [721, 221, 127, 196, "STORED value", "ستون مقدار ذخیره‌شده برای سایز انتخاب‌شده (در حافظه پنل). با زدن «ذخیره اطلاعات» ثبت می‌شود."],
+    [863, 221, 128, 196, "WORKING value", "ستون مقدار در حال کار: مقداری که الان روی دستگاه اعمال است. بعد از «ارسال به PLC» اینجا عوض می‌شود."],
+    [-3, 671, 203, 57, "Back", "دکمه بازگشت به صفحه قبل", "$back"],
+    [459, 674, 86, 55, "Home button", "دکمه خانه (دایره): برگشت به صفحه اصلی (لایوت).", "layout"],
+    [896, 674, 106, 55, "Square button", "دکمه مربع: رفتن به منوی اصلی.", "main-menu"],
+    [205, 671, 213, 57, "Login required", "قفل: برای تغییر مقدارها باید با سطح دسترسی مناسب وارد (Login) شوی. تا وقتی وارد نشده‌ای، پنل فقط نمایش می‌دهد."],
+    [-3, -6, 106, 55, "<<", "فلش قبلی: رفتن به صفحه قبل (General parameters).", "general-parameters"],
+    [896, -6, 112, 55, ">>", "فلش بعدی: رفتن به صفحه بعد (Stack count).", "stack-count"],
+  ]},
+  "stack-count": { title: "Stack count", image: "images/STACK COUNT", buttons: [
+    [3, -2, 1004, 57, "Stack count", "عنوان صفحه: تعداد استک"],
+    [9, 64, 265, 67, "SAVE DATA", "ذخیره اطلاعات: مقدارهای وارد‌شده را برای این سایز در پنل ذخیره می‌کند."],
+    [721, 59, 259, 72, "SEND -->PLC", "ارسال به PLC: مقدارها را به کنترلر می‌فرستد تا روی دستگاه اعمال شوند."],
+    [9, 141, 405, 81, "STORED SIZE", "سایز ذخیره‌شده: نام سایزی که مقدارهای ستون خاکستری مال آن است."],
+    [579, 141, 410, 81, "WORKING SIZE", "سایز در حال کار: نام سایزی که الان روی دستگاه فعال است."],
+    [9, 227, 668, 45, "Pusher bagger A stack count (pcs)", "تعداد محصول در هر استک برای پوشر بگر A (عدد)."],
+    [9, 278, 668, 45, "Paddles from photocell to pusher A (p)", "تعداد پدل‌ها از فتوسل تا پوشر A."],
+    [9, 329, 668, 46, "Calculated data for pusher A (p)", "مقدار محاسبه‌شده توسط دستگاه برای پوشر A (ردیف آبی؛ فقط نمایش)."],
+    [9, 382, 668, 46, "Pusher bagger B stack count (pcs)", "تعداد محصول در هر استک برای پوشر بگر B (عدد)."],
+    [9, 434, 668, 45, "Paddles from photocell to pusher B (p)", "تعداد پدل‌ها از فتوسل تا پوشر B."],
+    [9, 485, 668, 48, "Calculated data for pusher B (p)", "مقدار محاسبه‌شده توسط دستگاه برای پوشر B (ردیف آبی؛ فقط نمایش)."],
+    [717, 227, 128, 306, "STORED value", "ستون مقدار ذخیره‌شده برای سایز انتخاب‌شده (در حافظه پنل). با زدن «ذخیره اطلاعات» ثبت می‌شود."],
+    [860, 227, 126, 253, "WORKING value", "ستون مقدار در حال کار: مقداری که الان روی دستگاه اعمال است. بعد از «ارسال به PLC» اینجا عوض می‌شود."],
+    [3, 691, 198, 60, "Back", "دکمه بازگشت به صفحه قبل", "$back"],
+    [455, 693, 84, 56, "Home button", "دکمه خانه (دایره): برگشت به صفحه اصلی (لایوت).", "layout"],
+    [877, 693, 104, 56, "Square button", "دکمه مربع: رفتن به منوی اصلی.", "main-menu"],
+    [207, 691, 209, 60, "Login required", "قفل: برای تغییر مقدارها باید با سطح دسترسی مناسب وارد (Login) شوی. تا وقتی وارد نشده‌ای، پنل فقط نمایش می‌دهد."],
+    [3, -2, 85, 57, "<<", "فلش قبلی: رفتن به صفحه قبل (Stacker infeed).", "stacker-infeed"],
+    [904, -2, 88, 57, ">>", "فلش بعدی: رفتن به صفحه بعد (Outfeed pusher).", "outfeed-pusher"],
+  ]},
+  "outfeed-pusher": { title: "Outfeed pusher", image: "images/OUTFEED PUSHER", buttons: [
+    [-8, -8, 1015, 60, "Outfeed pusher", "عنوان صفحه: پوشر خروجی"],
+    [3, 57, 266, 62, "SAVE DATA", "ذخیره اطلاعات: مقدارهای وارد‌شده را برای این سایز در پنل ذخیره می‌کند."],
+    [722, 55, 269, 69, "SEND -->PLC", "ارسال به PLC: مقدارها را به کنترلر می‌فرستد تا روی دستگاه اعمال شوند."],
+    [3, 133, 411, 81, "STORED SIZE", "سایز ذخیره‌شده: نام سایزی که مقدارهای ستون خاکستری مال آن است."],
+    [579, 133, 413, 81, "WORKING SIZE", "سایز در حال کار: نام سایزی که الان روی دستگاه فعال است."],
+    [4, 216, 673, 44, "Bagger A crank pusher speed forward (%)", "سرعت حرکت رو به جلوی جاروبک بگر A (درصد)."],
+    [4, 270, 673, 44, "Bagger A crank pusher speed backward (%)", "سرعت برگشت (عقب) جاروبک بگر A (درصد)."],
+    [4, 323, 673, 44, "Start bagger A from stacker pusher (°)", "زاویه‌ای که بگر A نسبت به پوشر استکر شروع به کار می‌کند (درجه)."],
+    [4, 377, 673, 44, "Bagger B crank pusher speed forward (%)", "سرعت حرکت رو به جلوی جاروبک بگر B (درصد)."],
+    [4, 431, 673, 44, "Bagger B crank pusher speed backward (%)", "سرعت برگشت (عقب) جاروبک بگر B (درصد)."],
+    [4, 485, 673, 44, "Start bagger B from stacker pusher (°)", "زاویه‌ای که بگر B نسبت به پوشر استکر شروع به کار می‌کند (درجه)."],
+    [4, 536, 673, 46, "Paddle chain out offset position (%)", "آفست موقعیت زنجیر پره‌های استکر خروجی (درصد)."],
+    [165, 590, 659, 71, "Offset bar", "نوار نمایش مقدار آفست (۰ تا ۱۰۰ درصد)."],
+    [717, 216, 127, 368, "STORED value", "ستون مقدار ذخیره‌شده برای سایز انتخاب‌شده (در حافظه پنل). با زدن «ذخیره اطلاعات» ثبت می‌شود."],
+    [857, 216, 132, 368, "WORKING value", "ستون مقدار در حال کار: مقداری که الان روی دستگاه اعمال است. بعد از «ارسال به PLC» اینجا عوض می‌شود."],
+    [-3, 671, 203, 57, "Back", "دکمه بازگشت به صفحه قبل", "$back"],
+    [459, 674, 86, 55, "Home button", "دکمه خانه (دایره): برگشت به صفحه اصلی (لایوت).", "layout"],
+    [896, 674, 106, 55, "Square button", "دکمه مربع: رفتن به منوی اصلی.", "main-menu"],
+    [205, 671, 213, 57, "Login required", "قفل: برای تغییر مقدارها باید با سطح دسترسی مناسب وارد (Login) شوی. تا وقتی وارد نشده‌ای، پنل فقط نمایش می‌دهد."],
+    [-3, -9, 106, 55, "<<", "فلش قبلی: رفتن به صفحه قبل (Stack count).", "stack-count"],
+    [896, -9, 112, 55, ">>", "فلش بعدی: رفتن به صفحه بعد (General parameters).", "general-parameters"],
+  ]},
+  "general-data": { title: "General data", image: "images/GENERAL DATA", buttons: [
+    [-6, 4, 462, 51, "SETTINGS", "گروه «تنظیمات»: انتخاب سایز، اطلاعات عمومی، حالت کار، اطلاعات سیستم و داده‌های سایز."],
+    [-6, 55, 462, 51, "Size selection", "انتخاب سایز: انتخاب سایز کاری دستگاه و رفتن به صفحه‌های پارامتر سایز.", "size-selection"],
+    [-6, 108, 462, 49, "General data", "اطلاعات عمومی: پارامترهای کلی استکر مثل فاصله فتوسل تا زنجیر پره‌های استکر.", "general-data"],
+    [-6, 159, 462, 49, "Operation mode", "حالت کار: انتخاب نحوه کار دستگاه.", "operation-mode"],
+    [-6, 209, 462, 49, "System info", "اطلاعات سیستم: شمای استکر با نمایش وضعیت جاروبک‌ها، زنجیر پره‌های استکر و تسمه استکر.", "system-info"],
+    [-6, 260, 462, 49, "Size data", "داده‌های سایز: پارامترهای هر سایز (ورودی استکر، تعداد استک، پوشر خروجی و پارامترهای عمومی).", "size-data"],
+    [-6, 311, 462, 52, "MANUAL FUNCTIONS", "گروه «عملیات دستی»: دستورهای دستی، هوم کردن و کنترل شیرها."],
+    [-6, 364, 462, 47, "Manual operations", "عملیات دستی: حرکت دستی جاروبک به جلو و عقب و تست لامپ‌ها.", "manual-operations"],
+    [-6, 414, 462, 49, "Home", "هوم (Home): بردن زنجیر پره‌های استکر به حالت مرجع. پیام موفقیت: HOMING OK.", "home-homing"],
+    [-6, 465, 462, 49, "Valves control", "کنترل شیرها: روشن و خاموش کردن دستی شیرهای باد.", "valves-control"],
+    [-6, 515, 462, 49, "Scroll down", "فلش پایین: رفتن به ادامه منو (گروه عیب‌یابی و نمایش)."],
+    [482, 105, 517, 62, "General data", "عنوان پنل: اطلاعات عمومی."],
+    [484, 174, 507, 86, "Distance from twist photocell to paddle chain (mm)", "فاصله فتوسل تسمه استکر تا زنجیر پره‌های استکر، میلی‌متر."],
+    [881, 265, 108, 47, "1650", "مقدار فعلی فاصله (۱۶۵۰ میلی‌متر)."],
+    [540, 331, 380, 66, "STOP THE STACKER FOR TO CHANGE THIS PARAMETER", "هشدار: برای تغییر این پارامتر باید استکر را متوقف کنی."],
+    [484, 422, 390, 91, "Change direction of main machine encoder", "تغییر جهت انکودر ماشین اصلی: ۰ = خلاف جهت عقربه‌های ساعت، ۱ = در جهت عقربه‌های ساعت."],
+    [878, 445, 108, 47, "1", "مقدار فعلی جهت انکودر (۱ = در جهت عقربه‌های ساعت)."],
+    [-3, 671, 203, 57, "Back", "دکمه بازگشت به صفحه قبل", "$back"],
+    [459, 674, 86, 55, "Home button", "دکمه خانه (دایره): برگشت به صفحه اصلی (لایوت).", "layout"],
+    [896, 674, 106, 55, "Square button", "دکمه مربع: رفتن به منوی اصلی.", "main-menu"],
+    [205, 671, 213, 57, "Login required", "قفل: برای تغییر مقدارها باید با سطح دسترسی مناسب وارد (Login) شوی. تا وقتی وارد نشده‌ای، پنل فقط نمایش می‌دهد."],
+  ]},
+  "settings-menu": { title: "Settings menu", image: "images/SETTINGS MENU", buttons: [
+    [-4, 2, 462, 51, "SETTINGS", "گروه «تنظیمات»: انتخاب سایز، اطلاعات عمومی، حالت کار، اطلاعات سیستم و داده‌های سایز."],
+    [-4, 53, 462, 51, "Size selection", "انتخاب سایز: انتخاب سایز کاری دستگاه و رفتن به صفحه‌های پارامتر سایز.", "size-selection"],
+    [-4, 105, 462, 49, "General data", "اطلاعات عمومی: پارامترهای کلی استکر مثل فاصله فتوسل تا زنجیر پره‌های استکر.", "general-data"],
+    [-4, 156, 462, 49, "Operation mode", "حالت کار: انتخاب نحوه کار دستگاه.", "operation-mode"],
+    [-4, 206, 462, 49, "System info", "اطلاعات سیستم: شمای استکر با نمایش وضعیت جاروبک‌ها، زنجیر پره‌های استکر و تسمه استکر.", "system-info"],
+    [-4, 257, 462, 49, "Size data", "داده‌های سایز: پارامترهای هر سایز (ورودی استکر، تعداد استک، پوشر خروجی و پارامترهای عمومی).", "size-data"],
+    [-4, 308, 462, 52, "MANUAL FUNCTIONS", "گروه «عملیات دستی»: دستورهای دستی، هوم کردن و کنترل شیرها."],
+    [-4, 362, 462, 47, "Manual operations", "عملیات دستی: حرکت دستی جاروبک به جلو و عقب و تست لامپ‌ها.", "manual-operations"],
+    [-4, 412, 462, 49, "Home", "هوم (Home): بردن زنجیر پره‌های استکر به حالت مرجع. پیام موفقیت: HOMING OK.", "home-homing"],
+    [-4, 463, 462, 49, "Valves control", "کنترل شیرها: روشن و خاموش کردن دستی شیرهای باد.", "valves-control"],
+    [-4, 512, 462, 49, "Scroll down", "فلش پایین: رفتن به ادامه منو (گروه عیب‌یابی و نمایش)."],
+    [-2, 668, 203, 57, "Back", "دکمه بازگشت به صفحه قبل", "$back"],
+    [460, 670, 86, 55, "Home button", "دکمه خانه (دایره): برگشت به صفحه اصلی (لایوت).", "layout"],
+    [896, 670, 106, 55, "Square button", "دکمه مربع: رفتن به منوی اصلی.", "main-menu"],
+  ]},
+  "diagnostics-menu": { title: "Diagnostics menu", image: "images/DIAGNOSTICS MENU", buttons: [
+    [-9, 3, 465, 52, "Scroll up", "فلش بالا: برگشتن به گروه «تنظیمات»."],
+    [-9, 58, 465, 51, "DIAGNOSTICS", "گروه «عیب‌یابی»: آلارم‌ها، موقعیت U پوشر یا جاروبک بسته‌بندی (بگر) و تشخیص ورود محصول."],
+    [-9, 112, 465, 49, "Alarms on", "آلارم‌های فعال: آلارم‌هایی که همین الان فعال‌اند؛ با فلش >> کل تاریخچه باز می‌شود.", "alarms-on"],
+    [-9, 163, 465, 47, "'U' pos. BGA pusher", "موقعیت U پوشر یا جاروبک بسته‌بندی (بگر): مقدارهای مرجع شمارش استک و پدل‌ها.", "u-pos-bga-pusher"],
+    [-9, 214, 465, 49, "Infeed prod.detction", "تشخیص محصول ورودی: ثبت و نمایش مقدارهای ورود محصول.", "infeed-prod-detection"],
+    [-9, 268, 465, 51, "DATA COLLECTIONS", "گروه «جمع‌آوری داده»."],
+    [-9, 320, 465, 49, "Production data", "داده‌های تولید: آمار تولید."],
+    [-9, 372, 465, 51, "DISPLAY", "گروه «نمایش»: بررسی ورودی و خروجی، عملکرد پنل و زبان."],
+    [-9, 426, 465, 47, "I/O Check", "بررسی ورودی و خروجی‌ها (I/O): وضعیت لحظه‌ای ورودی‌ها و خروجی‌های PLC.", "io-check"],
+    [-9, 477, 465, 49, "Panel function", "عملکرد پنل: پشتیبان‌گیری، بازیابی، ورود کاربر و تنظیم ساعت.", "panel-function"],
+    [-9, 530, 465, 47, "Language", "زبان: انتخاب زبان پنل.", "language"],
+    [-4, 671, 203, 57, "Back", "دکمه بازگشت به صفحه قبل", "$back"],
+    [459, 673, 86, 55, "Home button", "دکمه خانه (دایره): برگشت به صفحه اصلی (لایوت).", "layout"],
+    [896, 673, 106, 55, "Square button", "دکمه مربع: رفتن به منوی اصلی.", "main-menu"],
+  ]},
+  "system-info": { title: "System info", image: "images/SYSTEM INFO", buttons: [
+    [-5, -9, 1017, 55, "System info", "عنوان صفحه: اطلاعات سیستم"],
+    [3, 74, 315, 40, "CRANK PUSHER B", "نام جاروبک B؛ خط وصل‌شده محل آن را روی شماتیک نشان می‌دهد. با کلیک، صفحه جاروبک‌ها باز می‌شود.", "crank-pushers"],
+    [344, 74, 317, 40, "PADDLE CHAIN OUT", "زنجیر پره‌های استکر خروجی. با کلیک، صفحه زنجیر پره‌های استکر باز می‌شود.", "paddle-chain"],
+    [681, 74, 321, 40, "CRANK PUSHER A", "نام جاروبک A. با کلیک، صفحه جاروبک‌ها باز می‌شود.", "crank-pushers"],
+    [194, 126, 95, 77, "Crank pusher B position", "محل جاروبک B روی شمای دستگاه. با کلیک، صفحه جاروبک‌ها باز می‌شود.", "crank-pushers"],
+    [289, 126, 96, 77, "Paddle chain out position", "محل زنجیر پره‌های استکر خروجی روی شمای دستگاه. با کلیک، صفحه زنجیر پره‌های استکر باز می‌شود.", "paddle-chain"],
+    [669, 126, 96, 77, "Crank pusher A position", "محل جاروبک A روی شمای دستگاه. با کلیک، صفحه جاروبک‌ها باز می‌شود.", "crank-pushers"],
+    [248, 224, 96, 71, "Paddle chain in position", "محل زنجیر پره‌های استکر ورودی روی شمای دستگاه. با کلیک، صفحه زنجیر پره‌های استکر باز می‌شود.", "paddle-chain"],
+    [393, 365, 334, 40, "PADDLE CHAIN IN", "زنجیر پره‌های استکر ورودی. با کلیک، صفحه زنجیر پره‌های استکر باز می‌شود.", "paddle-chain"],
+    [269, 340, 71, 162, "Twist belt position", "محل تسمه استکر روی شمای دستگاه. با کلیک، صفحه تسمه‌ها باز می‌شود.", "belts"],
+    [394, 468, 331, 41, "TWIST BELT", "تسمه استکر. با کلیک، صفحه تسمه‌ها باز می‌شود.", "belts"],
+    [14, 554, 480, 101, "Error message", "پیام خطای فعال؛ اگر خطایی باشد اینجا نوشته می‌شود."],
+    [504, 554, 489, 101, "Interruption point", "محل یا نقطه‌ای که باعث توقف شده است."],
+    [0, 671, 204, 57, "Back", "دکمه بازگشت به صفحه قبل", "$back"],
+    [464, 674, 86, 55, "Home button", "دکمه خانه (دایره): برگشت به صفحه اصلی (لایوت).", "layout"],
+    [901, 674, 106, 55, "Square button", "دکمه مربع: رفتن به منوی اصلی.", "main-menu"],
+  ]},
+  "crank-pushers": { title: "Crank pushers", image: "images/CRANK PUSHERS", buttons: [
+    [-11, -7, 1025, 56, "Crank pushers", "عنوان صفحه: جاروبک‌ها؛ فلش‌های << و >> برای صفحه قبل و بعد"],
+    [32, 66, 305, 31, "Servomotors current", "جریان سروموتورها (آمپر)."],
+    [643, 66, 130, 29, "Detected", "مقدار جریان اندازه‌گیری‌شده توسط دستگاه."],
+    [26, 99, 484, 48, "BG A Crank pusher (A)", "جریان سروموتور جاروبک بگر A (آمپر)."],
+    [523, 100, 110, 47, "Value A", "مقدار تنظیم‌شده جریان برای جاروبک A."],
+    [648, 100, 113, 47, "Detected A", "مقدار اندازه‌گیری‌شده جریان جاروبک A."],
+    [25, 153, 484, 47, "BG B Crank pusher (A)", "جریان سروموتور جاروبک بگر B (آمپر)."],
+    [522, 153, 110, 47, "Value B", "مقدار تنظیم‌شده جریان برای جاروبک B."],
+    [647, 153, 113, 47, "Detected B", "مقدار اندازه‌گیری‌شده جریان جاروبک B."],
+    [778, 246, 193, 94, "CONFIRM DATA", "تأیید داده‌ها: مقدارهای این بخش را تأیید می‌کند."],
+    [530, 380, 77, 31, "CODE", "کد وضعیت یا خطای درایو."],
+    [659, 380, 83, 31, "POS.", "موقعیت فعلی موتور."],
+    [774, 380, 90, 31, "TEMP.", "دمای موتور."],
+    [31, 424, 478, 45, "CRANK PUSHER A", "وضعیت درایو و سروو جاروبک A."],
+    [30, 478, 478, 50, "CRANK PUSHER B", "وضعیت درایو و سروو جاروبک B."],
+    [514, 424, 364, 45, "Code / Pos. / Temp. A", "کد، موقعیت و دمای جاروبک A."],
+    [514, 478, 364, 49, "Code / Pos. / Temp. B", "کد، موقعیت و دمای جاروبک B."],
+    [902, 431, 52, 52, "Thermometer", "نشانگر دما."],
+    [27, 602, 943, 39, "Status line", "نوار پیام وضعیت؛ OK یعنی مشکلی گزارش نشده."],
+    [-10, 691, 205, 60, "Back", "دکمه بازگشت به صفحه قبل", "$back"],
+    [456, 695, 88, 56, "Home button", "دکمه خانه (دایره): برگشت به صفحه اصلی (لایوت).", "layout"],
+    [887, 695, 104, 56, "Square button", "دکمه مربع: رفتن به منوی اصلی.", "main-menu"],
+    [200, 692, 216, 59, "Login required", "قفل: برای تغییر مقدارها باید با سطح دسترسی مناسب وارد (Login) شوی. تا وقتی وارد نشده‌ای، پنل فقط نمایش می‌دهد."],
+  ]},
+  "belts": { title: "Belts", image: "images/BELTS", buttons: [
+    [-9, 2, 1013, 56, "Belts", "عنوان صفحه: تسمه‌ها"],
+    [33, 73, 302, 30, "Servomotors current", "جریان سروموتور (آمپر)."],
+    [637, 72, 129, 29, "Detected", "مقدار جریان اندازه‌گیری‌شده."],
+    [26, 106, 479, 46, "Twist belt current (A)", "جریان سروموتور تسمه استکر (آمپر)."],
+    [517, 106, 110, 46, "Value", "مقدار تنظیم‌شده جریان."],
+    [641, 106, 112, 46, "Detected", "مقدار اندازه‌گیری‌شده جریان."],
+    [770, 251, 190, 93, "CONFIRM DATA", "تأیید داده‌ها: مقدارهای این بخش را تأیید می‌کند."],
+    [527, 382, 77, 32, "CODE", "کد وضعیت یا خطای درایو."],
+    [653, 382, 80, 32, "POS.", "موقعیت فعلی."],
+    [768, 382, 88, 30, "TEMP.", "دمای موتور."],
+    [32, 425, 473, 46, "TWIST BELT", "وضعیت درایو و سروو تسمه استکر."],
+    [512, 425, 359, 45, "Code / Pos. / Temp.", "کد، موقعیت و دمای تسمه استکر."],
+    [883, 433, 51, 51, "Thermometer", "نشانگر دما."],
+    [30, 601, 932, 39, "Status line", "نوار پیام وضعیت؛ OK یعنی مشکلی گزارش نشده."],
+    [-6, 691, 202, 58, "Back", "دکمه بازگشت به صفحه قبل", "$back"],
+    [455, 693, 86, 56, "Home button", "دکمه خانه (دایره): برگشت به صفحه اصلی (لایوت).", "layout"],
+    [879, 693, 104, 56, "Square button", "دکمه مربع: رفتن به منوی اصلی.", "main-menu"],
+    [201, 691, 213, 60, "Login required", "قفل: برای تغییر مقدارها باید با سطح دسترسی مناسب وارد (Login) شوی. تا وقتی وارد نشده‌ای، پنل فقط نمایش می‌دهد."],
+  ]},
+  "u-pos-bga-pusher": { title: "'U' pos. BGA pusher", image: "images/U POS BGA PUSHER", buttons: [
+    [-7, -8, 1015, 55, "'U' pos. BGA pusher", "عنوان صفحه: موقعیت U پوشر یا جاروبک بسته‌بندی (بگر)"],
+    [93, 108, 373, 89, "Pusher bagger A stack count (pcs)", "تعداد محصول در هر استک برای پوشر بگر A."],
+    [225, 199, 110, 46, "A stack count value", "مقدار تعداد استک A."],
+    [97, 256, 369, 85, "Paddles from photocell to pusher A (p)", "تعداد پدل‌ها از فتوسل تا پوشر A."],
+    [227, 347, 110, 46, "A paddles value", "مقدار پدل‌ها تا پوشر A."],
+    [534, 105, 374, 85, "Pusher bagger B stack count (pcs)", "تعداد محصول در هر استک برای پوشر بگر B."],
+    [666, 197, 110, 46, "B stack count value", "مقدار تعداد استک B."],
+    [534, 254, 374, 85, "Paddles from phc to pusher B (p)", "تعداد پدل‌ها از فتوسل تا پوشر B."],
+    [666, 346, 110, 46, "B paddles value", "مقدار پدل‌ها تا پوشر B."],
+    [322, 434, 363, 102, "Reference U for pusher bagger A (+-20mm)", "مرجع U برای پوشر بگر A با تلورانس ±۲۰ میلی‌متر."],
+    [441, 544, 126, 46, "Reference value", "مقدار مرجع."],
+    [113, 595, 795, 62, "Simoltaneous stripping mode", "حالت جداسازی همزمان (Simultaneous stripping mode)."],
+    [-2, 671, 203, 57, "Back", "دکمه بازگشت به صفحه قبل", "$back"],
+    [461, 674, 86, 55, "Home button", "دکمه خانه (دایره): برگشت به صفحه اصلی (لایوت).", "layout"],
+    [897, 674, 106, 55, "Square button", "دکمه مربع: رفتن به منوی اصلی.", "main-menu"],
+  ]},
+  "infeed-prod-detection": { title: "Infeed product recorder", image: "images/INFEED PROD DETECTION", buttons: [
+    [-7, -4, 1019, 55, "Infeed product recorder", "عنوان صفحه: ثبت‌کننده محصول ورودی"],
+    [-8, 59, 478, 512, "VALUE 1 - 11", "مقدارهای ۱ تا ۱۱ ثبت‌شده توسط تشخیص ورود محصول."],
+    [498, 59, 473, 423, "VALUE 12 - 20", "مقدارهای ۱۲ تا ۲۰ ثبت‌شده توسط تشخیص ورود محصول."],
+    [503, 490, 467, 48, "Average value", "میانگین مقدارهای ثبت‌شده."],
+    [503, 544, 467, 56, "Ideal posit.", "موقعیت ایده‌آل (مقدار مرجع)."],
+    [192, 608, 642, 61, "Converter speed", "سرعت کانورتر."],
+    [-2, 679, 204, 58, "Back", "دکمه بازگشت به صفحه قبل", "$back"],
+    [463, 681, 86, 55, "Home button", "دکمه خانه (دایره): برگشت به صفحه اصلی (لایوت).", "layout"],
+    [901, 681, 106, 55, "Square button", "دکمه مربع: رفتن به منوی اصلی.", "main-menu"],
+  ]},
+  "alarm-record": { title: "Alarm record", image: "images/ALARM RECORD", buttons: [
+    [-7, -7, 1013, 57, "Alarm record", "عنوان صفحه: تاریخچه آلارم‌ها"],
+    [-8, 53, 934, 619, "Alarm list", "هر خط: ساعت شروع، ساعت پایان، شماره و متن آلارم. خط قرمز که ساعت پایان ندارد، آلارمی است که هنوز فعال است."],
+    [936, 145, 59, 250, "Scroll arrows", "فلش‌های بالا و پایین برای حرکت در فهرست آلارم‌ها."],
+    [-7, -5, 101, 55, "<<", "فلش قبلی: برگشت به صفحه آلارم‌های فعال (Alarms on).", "alarms-on"],
+    [-2, 671, 203, 57, "Back", "دکمه بازگشت به صفحه قبل", "$back"],
+    [460, 674, 86, 55, "Home button", "دکمه خانه (دایره): برگشت به صفحه اصلی (لایوت).", "layout"],
+    [896, 674, 106, 55, "Square button", "دکمه مربع: رفتن به منوی اصلی.", "main-menu"],
+  ]},
+  "panel-function": { title: "Panel function", image: "images/PANEL FUNCTION", buttons: [
+    [-8, 2, 467, 53, "Scroll up", "فلش بالا: برگشتن به گروه «تنظیمات»."],
+    [-8, 57, 467, 51, "DIAGNOSTICS", "گروه «عیب‌یابی»: آلارم‌ها، موقعیت U پوشر یا جاروبک بسته‌بندی (بگر) و تشخیص ورود محصول."],
+    [-8, 111, 467, 49, "Alarms on", "آلارم‌های فعال: آلارم‌هایی که همین الان فعال‌اند؛ با فلش >> کل تاریخچه باز می‌شود.", "alarms-on"],
+    [-8, 162, 467, 48, "'U' pos. BGA pusher", "موقعیت U پوشر یا جاروبک بسته‌بندی (بگر): مقدارهای مرجع شمارش استک و پدل‌ها.", "u-pos-bga-pusher"],
+    [-8, 213, 467, 49, "Infeed prod.detction", "تشخیص محصول ورودی: ثبت و نمایش مقدارهای ورود محصول.", "infeed-prod-detection"],
+    [-8, 267, 467, 51, "DATA COLLECTIONS", "گروه «جمع‌آوری داده»."],
+    [-8, 320, 467, 49, "Production data", "داده‌های تولید: آمار تولید."],
+    [-8, 372, 467, 51, "DISPLAY", "گروه «نمایش»: بررسی ورودی و خروجی، عملکرد پنل و زبان."],
+    [-8, 426, 467, 48, "I/O Check", "بررسی ورودی و خروجی‌ها (I/O): وضعیت لحظه‌ای ورودی‌ها و خروجی‌های PLC.", "io-check"],
+    [-8, 477, 467, 49, "Panel function", "عملکرد پنل: پشتیبان‌گیری، بازیابی، ورود کاربر و تنظیم ساعت.", "panel-function"],
+    [-8, 530, 467, 48, "Language", "زبان: انتخاب زبان پنل.", "language"],
+    [489, 175, 515, 53, "Panel function", "عنوان پنل: عملکرد پنل."],
+    [491, 230, 512, 61, "Data backup", "پشتیبان‌گیری از داده‌های پنل."],
+    [491, 295, 512, 61, "Data restore", "بازیابی داده‌ها از پشتیبان."],
+    [491, 358, 512, 61, "Login", "ورود کاربر: رفتن به صفحه ورود.", "login"],
+    [491, 421, 512, 61, "Setup time", "تنظیم ساعت و تاریخ پنل.", "setup-time"],
+    [-3, 671, 204, 58, "Back", "دکمه بازگشت به صفحه قبل", "$back"],
+    [461, 674, 86, 55, "Home button", "دکمه خانه (دایره): برگشت به صفحه اصلی (لایوت).", "layout"],
+    [899, 674, 106, 55, "Square button", "دکمه مربع: رفتن به منوی اصلی.", "main-menu"],
+    [206, 671, 214, 58, "Login required", "قفل: برای تغییر مقدارها باید با سطح دسترسی مناسب وارد (Login) شوی. تا وقتی وارد نشده‌ای، پنل فقط نمایش می‌دهد."],
+  ]},
+  "setup-time": { title: "Setup time", image: "images/SETUP TIME", buttons: [
+    [-7, -9, 1013, 57, "Setup time", "عنوان صفحه: تنظیم ساعت"],
+    [147, 212, 710, 65, "Current date and time", "تاریخ و ساعت فعلی پنل (روز/ماه/سال، روز هفته و ساعت)."],
+    [151, 296, 706, 54, "dd mm yy - hh mm ss", "عنوان ستون‌ها: روز، ماه، سال | ساعت، دقیقه، ثانیه."],
+    [169, 365, 286, 88, "Date input", "وارد کردن روز، ماه و سال جدید."],
+    [547, 365, 290, 88, "Time input", "وارد کردن ساعت، دقیقه و ثانیه جدید."],
+    [-2, 669, 203, 57, "Back", "دکمه بازگشت به صفحه قبل", "$back"],
+    [460, 672, 86, 55, "Home button", "دکمه خانه (دایره): برگشت به صفحه اصلی (لایوت).", "layout"],
+    [896, 672, 106, 55, "Square button", "دکمه مربع: رفتن به منوی اصلی.", "main-menu"],
+  ]},
+  "io-check": { title: "I/O Check", image: "images/IO CHECK", buttons: [
+    [-7, -8, 1019, 55, "INPUT - OUTPUT +CC10", "عنوان صفحه: بررسی ورودی و خروجی؛ فلش‌های << و >> برای صفحه قبل و بعد"],
+    [32, 56, 293, 614, "CN3", "ماژول CN3: ردیف‌های I مربوط به ورودی‌ها و ردیف‌های T مربوط به خروجی‌ها هستند. رنگ هر کلید وضعیت همان کانال را نشان می‌دهد."],
+    [677, 56, 298, 356, "CN2", "ماژول CN2: ۱۶ کانال (۰۰۰ تا ۰۱۵). رنگ هر کلید وضعیت همان کانال را نشان می‌دهد."],
+    [374, 588, 634, 59, "24 VDC CONTROL SUPPLY", "ولتاژ تغذیه کنترل ۲۴ ولت DC (مقدار اندازه‌گیری‌شده)."],
+    [-2, 674, 204, 58, "Back", "دکمه بازگشت به صفحه قبل", "$back"],
+    [463, 677, 86, 55, "Home button", "دکمه خانه (دایره): برگشت به صفحه اصلی (لایوت).", "layout"],
+    [901, 677, 106, 55, "Square button", "دکمه مربع: رفتن به منوی اصلی.", "main-menu"],
+  ]},
+  "valves-control": { title: "Valves control", image: "images/VALVES CONTROL", buttons: [
+    [-4, 7, 465, 51, "SETTINGS", "گروه «تنظیمات»: انتخاب سایز، اطلاعات عمومی، حالت کار، اطلاعات سیستم و داده‌های سایز."],
+    [-4, 58, 465, 51, "Size selection", "انتخاب سایز: انتخاب سایز کاری دستگاه و رفتن به صفحه‌های پارامتر سایز.", "size-selection"],
+    [-4, 111, 465, 49, "General data", "اطلاعات عمومی: پارامترهای کلی استکر مثل فاصله فتوسل تا زنجیر پره‌های استکر.", "general-data"],
+    [-4, 162, 465, 49, "Operation mode", "حالت کار: انتخاب نحوه کار دستگاه.", "operation-mode"],
+    [-4, 212, 465, 49, "System info", "اطلاعات سیستم: شمای استکر با نمایش وضعیت جاروبک‌ها، زنجیر پره‌های استکر و تسمه استکر.", "system-info"],
+    [-4, 263, 465, 49, "Size data", "داده‌های سایز: پارامترهای هر سایز (ورودی استکر، تعداد استک، پوشر خروجی و پارامترهای عمومی).", "size-data"],
+    [-4, 315, 465, 53, "MANUAL FUNCTIONS", "گروه «عملیات دستی»: دستورهای دستی، هوم کردن و کنترل شیرها."],
+    [-4, 369, 465, 48, "Manual operations", "عملیات دستی: حرکت دستی جاروبک به جلو و عقب و تست لامپ‌ها.", "manual-operations"],
+    [-4, 419, 465, 49, "Home", "هوم (Home): بردن زنجیر پره‌های استکر به حالت مرجع. پیام موفقیت: HOMING OK.", "home-homing"],
+    [-4, 470, 465, 49, "Valves control", "کنترل شیرها: روشن و خاموش کردن دستی شیرهای باد.", "valves-control"],
+    [-4, 520, 465, 49, "Scroll down", "فلش پایین: رفتن به ادامه منو (گروه عیب‌یابی و نمایش)."],
+    [485, 405, 520, 61, "Valves control", "عنوان پنل: کنترل شیرها."],
+    [493, 472, 512, 56, "Cleaning photocell K132410", "تمیزکاری فتوسل با باد (شیر K132410). با کلید قرمز دستی روشن و خاموش می‌شود."],
+    [493, 530, 512, 61, "Paddle chain entry blow K132420", "دمش باد ورودی زنجیر پره‌های استکر (شیر K132420)."],
+    [493, 595, 512, 61, "Product waste blow K136510", "دمش باد ضایعات محصول (شیر K136510)."],
+    [-2, 677, 204, 58, "Back", "دکمه بازگشت به صفحه قبل", "$back"],
+    [463, 679, 86, 55, "Home button", "دکمه خانه (دایره): برگشت به صفحه اصلی (لایوت).", "layout"],
+    [901, 679, 106, 55, "Square button", "دکمه مربع: رفتن به منوی اصلی.", "main-menu"],
+    [207, 677, 214, 58, "Login required", "قفل: برای تغییر مقدارها باید با سطح دسترسی مناسب وارد (Login) شوی. تا وقتی وارد نشده‌ای، پنل فقط نمایش می‌دهد."],
+  ]},
+  "language": { title: "Language", image: "images/LANGUAGE", buttons: [
+    [-4, 20, 454, 55, "Scroll up", "فلش بالا: برگشتن به گروه «تنظیمات»."],
+    [-3, 75, 454, 52, "DIAGNOSTICS", "گروه «عیب‌یابی»: آلارم‌ها، موقعیت U پوشر یا جاروبک بسته‌بندی (بگر) و تشخیص ورود محصول."],
+    [-3, 129, 454, 51, "Alarms on", "آلارم‌های فعال: فهرست آلارم‌ها و تاریخچه آن‌ها.", "alarm-record"],
+    [-3, 180, 454, 50, "'U' pos. BGA pusher", "موقعیت U پوشر یا جاروبک بسته‌بندی (بگر): مقدارهای مرجع شمارش استک و پدل‌ها.", "u-pos-bga-pusher"],
+    [-2, 231, 454, 51, "Infeed prod.detction", "تشخیص محصول ورودی: ثبت و نمایش مقدارهای ورود محصول.", "infeed-prod-detection"],
+    [-2, 284, 454, 52, "DATA COLLECTIONS", "گروه «جمع‌آوری داده»."],
+    [-2, 337, 454, 51, "Production data", "داده‌های تولید: آمار تولید."],
+    [-2, 390, 454, 52, "DISPLAY", "گروه «نمایش»: بررسی ورودی و خروجی، عملکرد پنل و زبان."],
+    [-1, 444, 454, 50, "I/O Check", "بررسی ورودی و خروجی‌ها (I/O): وضعیت لحظه‌ای ورودی‌ها و خروجی‌های PLC.", "io-check"],
+    [-1, 495, 454, 51, "Panel function", "عملکرد پنل: پشتیبان‌گیری، بازیابی، ورود کاربر و تنظیم ساعت.", "panel-function"],
+    [-1, 546, 454, 49, "Language", "زبان: انتخاب زبان پنل.", "language"],
+    [479, 378, 504, 67, "Language", "عنوان پنل: زبان."],
+    [481, 445, 501, 63, "English", "انتخاب زبان انگلیسی."],
+    [481, 508, 500, 63, "Italiano", "انتخاب زبان ایتالیایی."],
+    [5, 688, 198, 58, "Back", "دکمه بازگشت به صفحه قبل", "$back"],
+    [456, 690, 84, 55, "Home button", "دکمه خانه (دایره): برگشت به صفحه اصلی (لایوت).", "layout"],
+    [876, 690, 103, 55, "Square button", "دکمه مربع: رفتن به منوی اصلی.", "main-menu"],
+  ]},
+  "login": { title: "Login", image: "images/LOGIN", buttons: [
+    [-7, -11, 1013, 52, "Login", "عنوان صفحه: ورود کاربر"],
+    [119, 49, 772, 54, "User ID / Level", "کاربر فعلی و سطح دسترسی او."],
+    [9, 120, 471, 319, "Log In", "بخش ورود: شناسه کاربر و رمز را وارد کن."],
+    [260, 176, 207, 52, "Enter User ID", "جای وارد کردن شناسه کاربر."],
+    [260, 240, 207, 52, "Enter password", "جای وارد کردن رمز."],
+    [128, 321, 237, 91, "Confirm", "تأیید ورود."],
+    [232, 522, 209, 110, "Log Out", "خروج از حساب کاربری."],
+    [521, 161, 474, 327, "User List", "فهرست کاربران و سطح دسترسی: BRONZE=01، SILVER=02، GOLD=03، MAINT=04، ADMIN=06."],
+    [505, 511, 502, 66, "Password Settings >>", "تنظیمات رمز عبور."],
+    [505, 582, 502, 68, "Control status password >>", "کنترل وضعیت رمز."],
+    [-2, 668, 203, 57, "Back", "دکمه بازگشت به صفحه قبل", "$back"],
+    [460, 670, 86, 55, "Home button", "دکمه خانه (دایره): برگشت به صفحه اصلی (لایوت).", "layout"],
+    [896, 670, 106, 55, "Square button", "دکمه مربع: رفتن به منوی اصلی.", "main-menu"],
+  ]},
+  "manual-operations": { title: "Manual operations", image: ["images/MANUAL", "images/MANOUAL"], buttons: [
+    [8, 15, 453, 52, "SETTINGS", "گروه «تنظیمات»."],
+    [8, 71, 453, 48, "Size selection", "انتخاب سایز.", "size-selection"],
+    [8, 121, 453, 49, "General data", "اطلاعات عمومی.", "general-data"],
+    [8, 173, 453, 49, "Operation mode", "حالت کار.", "operation-mode"],
+    [8, 224, 453, 49, "System info", "اطلاعات سیستم.", "system-info"],
+    [8, 275, 453, 50, "Size data", "داده‌های سایز.", "size-data"],
+    [8, 328, 453, 51, "MANUAL FUNCTIONS", "گروه «عملیات دستی»."],
+    [8, 382, 453, 49, "Manual operations", "عملیات دستی (انتخاب‌شده)."],
+    [8, 434, 453, 49, "Home", "هوم: بردن زنجیر پره‌های استکر به حالت مرجع.", "home-homing"],
+    [8, 485, 453, 48, "Valves control", "کنترل شیرها.", "valves-control"],
+    [484, 379, 508, 55, "Manual operations", "عنوان پنل: عملیات دستی."],
+    [487, 435, 505, 61, "Crank pusher forward", "حرکت دستی جاروبک به جلو."],
+    [487, 499, 505, 61, "Crank pusher back", "حرکت دستی جاروبک به عقب."],
+    [487, 562, 505, 62, "Lamp test", "تست لامپ‌ها: روشن کردن لامپ‌ها برای کنترل سالم‌بودنشان."],
+    [8, 704, 179, 46, "Back", "دکمه بازگشت به صفحه قبل", "$back"],
+    [456, 704, 83, 46, "Home button", "دکمه خانه (دایره): برگشت به صفحه اصلی (لایوت).", "layout"],
+    [883, 704, 104, 46, "Square button", "دکمه مربع: رفتن به منوی اصلی.", "main-menu"],
+  ]},
+  "home-homing": { title: "Home / Homing", image: "images/HOMING", buttons: [
+    [3, 13, 460, 51, "SETTINGS", "گروه «تنظیمات»."],
+    [3, 66, 460, 49, "Size selection", "انتخاب سایز.", "size-selection"],
+    [3, 118, 460, 51, "General data", "اطلاعات عمومی.", "general-data"],
+    [3, 171, 460, 49, "Operation mode", "حالت کار.", "operation-mode"],
+    [3, 223, 460, 49, "System info", "اطلاعات سیستم.", "system-info"],
+    [3, 274, 460, 49, "Size data", "داده‌های سایز.", "size-data"],
+    [3, 325, 460, 49, "MANUAL FUNCTIONS", "گروه «عملیات دستی»."],
+    [3, 376, 460, 51, "Manual operations", "عملیات دستی.", "manual-operations"],
+    [3, 430, 460, 49, "Home", "هوم (صفحه فعلی): بردن زنجیر پره‌های استکر به حالت مرجع."],
+    [3, 480, 460, 49, "Valves control", "کنترل شیرها.", "valves-control"],
+    [506, 320, 474, 71, "Home", "عنوان پنل: هوم؛ بردن زنجیر پره‌های استکر به حالت مرجع."],
+    [511, 430, 341, 79, "HOMING OK", "پیام وضعیت: هوم زنجیر پره‌های استکر با موفقیت انجام شد و به حالت مرجع رسید (HOMING OK)."],
+    [862, 424, 110, 113, "Home picture", "تصویر خانه کنار پیام هوم."],
+    [-5, 699, 183, 50, "Back", "دکمه بازگشت به صفحه قبل", "$back"],
+    [454, 699, 85, 50, "Home button", "دکمه خانه (دایره): برگشت به صفحه اصلی (لایوت).", "layout"],
+    [882, 699, 104, 50, "Square button", "دکمه مربع: رفتن به منوی اصلی.", "main-menu"],
+  ]},
+  "general-parameters": { title: "General parameters", image: "images/GENERAL PARAMETERS", buttons: [
+    [-9, -2, 1013, 60, "General parameters", "عنوان صفحه: پارامترهای عمومی؛ فلش‌های << و >> برای رفتن به صفحه قبل و بعد"],
+    [12, 65, 261, 63, "SAVE DATA", "ذخیره اطلاعات: مقدارهای وارد‌شده را برای این سایز در پنل ذخیره می‌کند."],
+    [721, 60, 266, 68, "SEND -->PLC", "ارسال به PLC: مقدارها را به کنترلر می‌فرستد تا روی دستگاه اعمال شوند."],
+    [9, 141, 405, 81, "STORED SIZE", "سایز ذخیره‌شده: نام سایزی که مقدارهای ستون خاکستری مال آن است."],
+    [581, 137, 410, 82, "WORKING SIZE", "سایز در حال کار: نام سایزی که الان روی دستگاه فعال است."],
+    [9, 225, 670, 48, "Paddle chain IN: num. of teeth of sprocket", "زنجیر پره‌های استکر ورودی: تعداد دندانه‌های چرخ‌دنده (اسپراکت)."],
+    [9, 276, 670, 48, "Number of chain pitch between 2 paddles", "تعداد گام زنجیر بین دو پدل."],
+    [718, 225, 126, 98, "STORED value", "ستون مقدار ذخیره‌شده برای سایز انتخاب‌شده (در حافظه پنل). با زدن «ذخیره اطلاعات» ثبت می‌شود."],
+    [860, 225, 127, 98, "WORKING value", "ستون مقدار در حال کار: مقداری که الان روی دستگاه اعمال است. بعد از «ارسال به PLC» اینجا عوض می‌شود."],
+    [-9, 693, 206, 59, "Back", "دکمه بازگشت به صفحه قبل", "$back"],
+    [454, 693, 83, 59, "Home button", "دکمه خانه (دایره): برگشت به صفحه اصلی (لایوت).", "layout"],
+    [888, 693, 100, 59, "Square button", "دکمه مربع: رفتن به منوی اصلی.", "main-menu"],
+    [197, 693, 221, 59, "Login required", "قفل: برای تغییر مقدارها باید با سطح دسترسی مناسب وارد (Login) شوی. تا وقتی وارد نشده‌ای، پنل فقط نمایش می‌دهد."],
+    [-1, -2, 61, 60, "<<", "فلش قبلی: رفتن به صفحه قبل (Outfeed pusher).", "outfeed-pusher"],
+    [935, -2, 61, 60, ">>", "فلش بعدی: رفتن به صفحه بعد (Stacker infeed).", "stacker-infeed"],
+  ]},
+  "size-data": { title: "Size data", image: "images/SIZE DATA", buttons: [
+    [-13, 0, 467, 54, "SETTINGS", "گروه «تنظیمات»: انتخاب سایز، اطلاعات عمومی، حالت کار، اطلاعات سیستم و داده‌های سایز."],
+    [-13, 53, 467, 52, "Size selection", "انتخاب سایز: انتخاب سایز کاری دستگاه و رفتن به صفحه‌های پارامتر سایز.", "size-selection"],
+    [-13, 107, 467, 51, "General data", "اطلاعات عمومی: پارامترهای کلی استکر مثل فاصله فتوسل تا زنجیر پره‌های استکر.", "general-data"],
+    [-13, 161, 467, 50, "Operation mode", "حالت کار: انتخاب نحوه کار دستگاه.", "operation-mode"],
+    [-13, 212, 465, 51, "System info", "اطلاعات سیستم: شمای استکر با نمایش وضعیت جاروبک‌ها، زنجیر پره‌های استکر و تسمه استکر.", "system-info"],
+    [-14, 264, 467, 51, "Size data", "داده‌های سایز: اطلاعات مربوط به سایزها."],
+    [-14, 318, 467, 55, "MANUAL FUNCTIONS", "گروه «عملیات دستی»: دستورهای دستی، هوم کردن و کنترل شیرها."],
+    [-14, 372, 467, 50, "Manual operations", "عملیات دستی: حرکت دستی جاروبک به جلو و عقب و تست لامپ‌ها.", "manual-operations"],
+    [-14, 425, 467, 50, "Home", "هوم (Home): بردن زنجیر پره‌های استکر به حالت مرجع. پیام موفقیت: HOMING OK.", "home-homing"],
+    [-14, 476, 467, 51, "Valves control", "کنترل شیرها: روشن و خاموش کردن دستی شیرهای باد.", "valves-control"],
+    [-14, 530, 467, 50, "Scroll down", "فلش پایین: رفتن به ادامه منو (گروه عیب‌یابی و نمایش)."],
+    [-12, 689, 205, 60, "Back", "دکمه بازگشت به صفحه قبل", "$back"],
+    [454, 694, 86, 56, "Home button", "دکمه خانه (دایره): برگشت به صفحه اصلی (لایوت).", "layout"],
+    [877, 694, 104, 56, "Square button", "دکمه مربع: رفتن به منوی اصلی.", "main-menu"],
+    [482, 178, 515, 54, "Size data", "عنوان پنل: داده‌های سایز؛ پارامترهای هر سایز در این بخش‌اند."],
+    [482, 234, 515, 65, "Stacker infeed", "پارامترهای ورودی استکر (گام تسمه استکر، سرعت دمنده، زنجیر پره‌های استکر).", "stacker-infeed"],
+    [482, 301, 515, 61, "Stack count", "تعداد استک و پدل‌ها از فتوسل تا هر پوشر.", "stack-count"],
+    [482, 364, 515, 61, "Outfeed pusher", "سرعت و زاویه شروع جاروبک‌ها و آفست زنجیر پره‌های استکر خروجی.", "outfeed-pusher"],
+    [482, 429, 515, 65, "General parameters", "پارامترهای عمومی (چرخ‌دنده و گام زنجیر پره‌های استکر ورودی).", "general-parameters"],
+  ]},
+  "alarms-on": { title: "Alarms on", image: "images/ALARMS ON", buttons: [
+    [-5, -7, 1013, 63, "Alarms on", "عنوان صفحه: آلارم‌های فعال؛ با فلش >> سمت راست وارد کل لیست آلارم‌ها می‌شوی."],
+    [-5, 58, 1013, 601, "Active alarms", "فهرست آلارم‌های فعال: هر خط آلارمی است که همین الان فعال است. با فلش >> بالا سمت راست، کل تاریخچه آلارم‌ها باز می‌شود."],
+    [-5, 60, 642, 46, "1079-BAGGER B NOT READY", "آلارم فعال: شماره ۱۰۷۹، بگر B آماده نیست."],
+    [944, -4, 66, 57, ">>", "فلش بعدی: رفتن به کل لیست آلارم‌ها (Alarm record).", "alarm-record"],
+    [-3, 697, 189, 51, "Back", "دکمه بازگشت به صفحه قبل", "$back"],
+    [454, 698, 88, 49, "Home button", "دکمه خانه (دایره): برگشت به صفحه اصلی (لایوت).", "layout"],
+    [886, 698, 103, 49, "Square button", "دکمه مربع: رفتن به منوی اصلی.", "main-menu"],
+  ]},
+  "operation-mode": { title: "Operation mode", image: "images/OPERATION MODE", buttons: [
+    [-7, 4, 463, 51, "SETTINGS", "گروه «تنظیمات»: انتخاب سایز، اطلاعات عمومی، حالت کار، اطلاعات سیستم و داده‌های سایز."],
+    [-7, 55, 463, 51, "Size selection", "انتخاب سایز.", "size-selection"],
+    [-7, 108, 463, 49, "General data", "اطلاعات عمومی.", "general-data"],
+    [-7, 159, 463, 49, "Operation mode", "حالت کار (صفحه فعلی)."],
+    [-7, 209, 463, 49, "System info", "اطلاعات سیستم.", "system-info"],
+    [-7, 260, 463, 49, "Size data", "داده‌های سایز.", "size-data"],
+    [-7, 311, 463, 52, "MANUAL FUNCTIONS", "گروه «عملیات دستی»."],
+    [-7, 365, 463, 47, "Manual operations", "عملیات دستی.", "manual-operations"],
+    [-7, 415, 463, 49, "Home", "هوم: بردن زنجیر پره‌های استکر به حالت مرجع.", "home-homing"],
+    [-7, 466, 463, 49, "Valves control", "کنترل شیرها.", "valves-control"],
+    [-7, 516, 463, 49, "Scroll down", "فلش پایین: رفتن به ادامه منو (گروه عیب‌یابی و نمایش)."],
+    [496, 113, 502, 50, "Operation mode", "عنوان پنل: حالت کار."],
+    [496, 164, 502, 47, "Product simulation", "شبیه‌سازی محصول: وقتی روشن باشد دستگاه بدون محصول واقعی، ورود محصول را شبیه‌سازی می‌کند. کلید آبی = خاموش، سبز = روشن."],
+    [496, 214, 502, 77, "Dry run speed", "سرعت کار بدون محصول (Dry run)؛ مقدار فعلی ۸۰۰."],
+    [496, 295, 502, 47, "Product emptyng", "تخلیه محصول: خالی کردن محصول باقی‌مانده روی استکر. کلید آبی = خاموش، سبز = روشن."],
+    [496, 346, 502, 47, "Stacker testing", "تست استکر: اجرای حالت آزمایشی استکر. کلید آبی = خاموش، سبز = روشن."],
+    [496, 397, 502, 47, "Bagger 'A' enabled", "فعال بودن بگر A. سبز = فعال، آبی = غیرفعال."],
+    [496, 448, 502, 47, "Bagger 'B' enabled", "فعال بودن بگر B. سبز = فعال، آبی = غیرفعال."],
+    [496, 500, 502, 47, "Bagger 'A' waste", "حالت ضایعات بگر A. کلید آبی = خاموش، سبز = روشن."],
+    [496, 551, 502, 47, "Bagger 'B' waste", "حالت ضایعات بگر B. کلید آبی = خاموش، سبز = روشن."],
+    [-4, 672, 203, 57, "Back", "دکمه بازگشت به صفحه قبل", "$back"],
+    [459, 674, 86, 55, "Home button", "دکمه خانه (دایره): برگشت به صفحه اصلی (لایوت).", "layout"],
+    [896, 674, 106, 55, "Square button", "دکمه مربع: رفتن به منوی اصلی.", "main-menu"],
+  ]},
+  "paddle-chain": { title: "Paddle chain", image: "images/PADDLE CHAIN", buttons: [
+    [5, -6, 1001, 58, "Paddle chain", "عنوان صفحه: زنجیر پره‌های استکر؛ فلش‌های << و >> برای صفحه قبل و بعد"],
+    [43, 68, 301, 27, "Servomotors current", "جریان سروموتورهای زنجیر پره‌های استکر (آمپر)."],
+    [640, 68, 127, 27, "Detected", "مقدار جریان اندازه‌گیری‌شده توسط دستگاه."],
+    [37, 99, 476, 44, "Paddle chain IN (A)", "جریان سروموتور زنجیر پره‌های استکر ورودی (آمپر)."],
+    [524, 99, 108, 44, "Value IN", "مقدار تنظیم‌شده جریان زنجیر ورودی (مثلاً ۶٫۶)."],
+    [645, 99, 109, 44, "Detected IN", "مقدار اندازه‌گیری‌شده جریان زنجیر ورودی (مثلاً ۵٫۰)."],
+    [37, 149, 476, 44, "Paddlechain OUT (A)", "جریان سروموتور زنجیر پره‌های استکر خروجی (آمپر)."],
+    [524, 149, 108, 44, "Value OUT", "مقدار تنظیم‌شده جریان زنجیر خروجی (مثلاً ۶٫۷)."],
+    [645, 149, 109, 44, "Detected OUT", "مقدار اندازه‌گیری‌شده جریان زنجیر خروجی (مثلاً ۶٫۸)."],
+    [773, 237, 190, 90, "CONFIRM DATA", "تأیید داده‌ها: مقدارهای این بخش را تأیید می‌کند."],
+    [534, 361, 75, 30, "CODE", "کد وضعیت یا خطای درایو."],
+    [660, 361, 77, 30, "POS.", "موقعیت فعلی موتور."],
+    [772, 361, 106, 30, "TEMP.", "دمای موتور."],
+    [35, 405, 474, 45, "PADDLE CHAIN IN", "وضعیت درایو و سروو زنجیر پره‌های استکر ورودی."],
+    [35, 460, 474, 47, "PADDLE CHAIN OUT", "وضعیت درایو و سروو زنجیر پره‌های استکر خروجی."],
+    [515, 405, 361, 45, "Code / Pos. / Temp. IN", "کد، موقعیت و دمای زنجیر ورودی."],
+    [515, 460, 361, 46, "Code / Pos. / Temp. OUT", "کد، موقعیت و دمای زنجیر خروجی."],
+    [886, 411, 55, 52, "Thermometer", "نشانگر دما."],
+    [28, 581, 941, 37, "Status line", "نوار پیام وضعیت؛ OK یعنی مشکلی گزارش نشده."],
+    [-13, 666, 208, 61, "Back", "دکمه بازگشت به صفحه قبل", "$back"],
+    [459, 670, 90, 57, "Home button", "دکمه خانه (دایره): برگشت به صفحه اصلی (لایوت).", "layout"],
+    [896, 670, 106, 57, "Square button", "دکمه مربع: رفتن به منوی اصلی.", "main-menu"],
+    [199, 667, 219, 60, "Login required", "قفل: برای تغییر مقدارها باید با سطح دسترسی مناسب وارد (Login) شوی. تا وقتی وارد نشده‌ای، پنل فقط نمایش می‌دهد."],
+  ]},
+};
+
+/* ===== عکس‌های پوشه images/layout (قسمت‌هایی که کلیک می‌کنی و به عکس دیگر می‌رود) =====
+   مثال (حذف یا عوض کن):
+   "belt-motor": { title: "Twist belt", image: "images/layout/TWIST BELT",
+     buttons: [ [120, 80, 200, 150, "Motor", "موتور تسمه استکر", "$back"] ] },
+   برای وصل‌کردن به لایوت، مقصد یکی از دکمه‌های صفحه "layout" را اسم همین صفحه ("belt-motor") بگذار. */
+const EXTRA = {
+};
+Object.assign(PAGES, EXTRA);
+
+const panel = document.getElementById("panel"), panelImage = document.getElementById("panelImage"), tip = document.getElementById("hmiTooltip");
+const ttTitle = document.getElementById("ttTitle"), ttText = document.getElementById("ttText"), ttHint = document.getElementById("ttHint"), msg = document.getElementById("msg");
+let cur = "layout", hist = [], armed = null, ptype = "mouse", p1 = null;
+/* لمس: نگه داشتن انگشت (بیشتر از LONG_MS) فقط توضیح را نشان می‌دهد؛ لمس کوتاه توضیح را نشان می‌دهد و بعد از AUTO_MS وارد صفحه می‌شود */
+const LONG_MS = 400, AUTO_MS = 600; let downT = 0, hideT = null, autoT = null, touching = false;
+
+function toast(t) { msg.textContent = t; msg.style.display = "block"; clearTimeout(toast.t); toast.t = setTimeout(() => msg.style.display = "none", 4000); }
+function hideTip() { tip.style.display = "none"; }
+function showTip(z, x, y, hint, rect) {
+  ttTitle.textContent = z[4]; ttText.textContent = z[5]; ttHint.textContent = hint || "";
+  tip.classList.toggle("wide", z[5].length > 70);
+  tip.style.display = "block";
+  const tw = tip.offsetWidth, th = tip.offsetHeight, vw = innerWidth, vh = innerHeight;
+  let l, t;
+  if (rect) {   /* لمس: توضیح بالای دکمه می‌آید تا زیر انگشت نماند */
+    l = (rect.left + rect.right) / 2 - tw / 2; t = rect.top - th - 8;
+    if (t < 5) t = rect.bottom + 8;
+  } else {
+    l = x + 14; t = y + 14;
+    if (l + tw > vw - 5) l = x - tw - 14;
+  }
+  if (t + th > vh - 5) t = Math.max(5, vh - th - 5);
+  tip.style.left = Math.max(5, Math.min(l, vw - tw - 5)) + "px"; tip.style.top = Math.max(5, t) + "px";
+}
+/* اسم عکس بدون پسوند نوشته می‌شود (مثل "images/MAIN MENU"). کد خودش پسوندهای png و jpg را امتحان می‌کند.
+   می‌شود چند اسم جایگزین هم داد: ["images/LAYOUT", "images/LAYOTE"]. حروف بزرگ و کوچک مهم‌اند. */
+const EXTS = [".png", ".jpg", ".jpeg", ".PNG", ".JPG", ".JPEG"];
+function loadImage(p) {
+  const bases = [].concat(p.image), list = [];
+  bases.forEach(b => EXTS.forEach(e => list.push(/\.(png|jpe?g)$/i.test(b) ? b : b + e)));
+  let i = 0;
+  const next = () => { if (i >= list.length) { toast("عکس پیدا نشد: " + bases[0] + " (اسم فایل، پسوند و پوشه را چک کن؛ حروف بزرگ و کوچک مهم‌اند)"); return; } panelImage.src = list[i++]; };
+  panelImage.onerror = next; next();
+}
+function render(key) {
+  const p = PAGES[key]; cur = key; crop = null; armed = null; clearTimeout(autoT); hideLabels(); hideTip(); p1 = null; if (clockEl) { clockEl.remove(); clockEl = null; }
+  panel.querySelectorAll("button.z").forEach(b => b.remove());
+  loadImage(p);
+  p.buttons.forEach(z => {
+    const b = document.createElement("button"); b.type = "button"; b.className = "z" + (z[6] && (z[6] === "$back" || PAGES[z[6]]) ? " go" : "");
+    b.style.left = z[0] + "px"; b.style.top = z[1] + "px"; b.style.width = z[2] + "px"; b.style.height = z[3] + "px";
+    b.setAttribute("aria-label", z[4] + ": " + z[5]);
+    b.addEventListener("pointerdown", e => {
+      ptype = e.pointerType; downT = performance.now();
+      if (ptype !== "mouse") { touching = true; clearTimeout(hideT); showTip(z, 0, 0, "", b.getBoundingClientRect()); }
+    });
+    b.addEventListener("pointerenter", e => { if (e.pointerType === "mouse") showTip(z, e.clientX, e.clientY); });
+    b.addEventListener("pointermove", e => { if (e.pointerType === "mouse") showTip(z, e.clientX, e.clientY); });
+    b.addEventListener("pointerleave", e => { if (e.pointerType === "mouse") hideTip(); });
+    b.addEventListener("click", e => {
+      hideLabels();
+      const go = z[6], ok = go === "$back" || (go && PAGES[go]);
+      if (ptype === "touch" || ptype === "pen") {
+        clearTimeout(autoT);
+        if (performance.now() - downT >= LONG_MS) { armed = null; return; }   /* نگه داشتن = فقط توضیح */
+        if (armed !== z) {
+          armed = z;
+          if (ok) autoT = setTimeout(() => { if (armed === z) { armed = null; navigate(go); } }, AUTO_MS);
+          return;
+        }
+        armed = null;
+      }
+      if (ok) navigate(go);
+    });
+    panel.append(b);
+  });
+  fitPanel();
+}
+function navigate(key) {
+  if (key === "$back") { if (hist.length) render(hist.pop()); return; }
+  if (!PAGES[key]) return;
+  hist.push(cur); if (hist.length > 50) hist.shift();
+  render(key);
+}
+
+/* ===== لمس قسمت خالی: معنی همه قسمت‌های صفحه یک‌جا نشان داده می‌شود (دوباره لمس یا ۶ ثانیه = بسته شدن) ===== */
+let labelsTimer = null;
+function hideLabels() { clearTimeout(labelsTimer); panel.querySelectorAll(".hmi-label").forEach(e => e.remove()); panel.classList.remove("labels-on"); }
+function shortText(z) {
+  let t = z[5]; const i = t.indexOf(":");
+  if (i > 1) {
+    const pre = t.slice(0, i).trim();
+    if (/^عنوان (صفحه|پنل)$/.test(pre) || /^دکمه (مربع|خانه)/.test(pre)) t = t.slice(i + 1).trim();   /* عنوان و دکمه‌های پایین: خود توضیح نشان داده می‌شود */
+    else if (pre.length <= 32) return pre;
+  }
+  return t.split(/[.؛]/)[0].trim();   /* کامل، بدون نقطه‌چین */
+}
+function addLabel(x, y, w, h, text) {
+  if (!text || w < 6 || h < 6) return;
+  const MINW = 64, MINH = 22;
+  if (w < MINW) { x -= (MINW - w) / 2; w = MINW; }
+  if (h < MINH) { y -= (MINH - h) / 2; h = MINH; }
+  const d = document.createElement("div"); d.className = "hmi-label";
+  d.style.left = x + "px"; d.style.top = y + "px"; d.style.width = w + "px"; d.style.height = h + "px";
+  d.textContent = text; panel.appendChild(d);
+  let fs = 16; d.style.fontSize = fs + "px";
+  while (fs > 10 && (d.scrollHeight > d.clientHeight + 1 || d.scrollWidth > d.clientWidth + 1)) { fs--; d.style.fontSize = fs + "px"; }
+  if (d.scrollWidth > d.clientWidth + 1) { const nw = d.scrollWidth + 8; d.style.left = (x - (nw - w) / 2) + "px"; d.style.width = nw + "px"; }
+  if (d.scrollHeight > d.clientHeight + 1) { const nh = d.scrollHeight + 2; d.style.top = (y - (nh - h) / 2) + "px"; d.style.height = nh + "px"; }
+}
+function fitLabelFont(e) {
+  e.style.overflow = "hidden";
+  let fs = parseFloat(e.style.fontSize) || 14;
+  while (fs > 8 && (e.scrollHeight > e.clientHeight + 1 || e.scrollWidth > e.clientWidth + 1)) { fs -= 0.5; e.style.fontSize = fs + "px"; }
+  if (e.scrollHeight > e.clientHeight + 1 || e.scrollWidth > e.clientWidth + 1) e.style.overflow = "visible";
+}
+function resolveLabelOverlaps() {
+  const els = [...panel.querySelectorAll(".hmi-label")];
+  if (els.length < 2) return;
+  const W = panel.offsetWidth, H = panel.offsetHeight;
+  const R = els.map(e => ({ e, x: e.offsetLeft, y: e.offsetTop, w: e.offsetWidth, h: e.offsetHeight }));
+  const ovl = (a, b) => [Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x), Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y)];
+  R.forEach(a => {   /* کادر بزرگی که چند کادر کوچک در آن است: کوچک و وسط‌چین می‌شود */
+    if (a.w < 260 || a.h < 60) return;
+    const inside = R.filter(b => { if (b === a) return false; const [ox, oy] = ovl(a, b); return ox > 0 && oy > 0 && ox * oy >= 0.1 * b.w * b.h && a.w * a.h > 4 * b.w * b.h; }).length;
+    if (!inside) return;
+    const cx = a.x + a.w / 2, cy = a.y + a.h / 2, nw = Math.min(a.w, 260);
+    a.e.style.width = nw + "px"; a.e.style.height = "auto";
+    a.w = a.e.offsetWidth; a.h = a.e.offsetHeight; a.x = cx - a.w / 2; a.y = cy - a.h / 2;
+  });
+  for (let it = 0; it < 400; it++) {
+    let moved = false;
+    for (let i = 0; i < R.length; i++) for (let j = i + 1; j < R.length; j++) {
+      const a = R[i], b = R[j], [ox, oy] = ovl(a, b);
+      if (ox <= 0.5 || oy <= 0.5) continue;
+      moved = true;
+      if (oy <= ox) { const k = oy / 2 + 0.6, up = a.y + a.h / 2 <= b.y + b.h / 2; if (up) { a.y -= k; b.y += k; } else { a.y += k; b.y -= k; } }
+      else { const k = ox / 2 + 0.6, left = a.x + a.w / 2 <= b.x + b.w / 2; if (left) { a.x -= k; b.x += k; } else { a.x += k; b.x -= k; } }
+    }
+    if (W && H) R.forEach(r => { r.x = Math.max(0, Math.min(r.x, W - r.w)); r.y = Math.max(0, Math.min(r.y, H - r.h)); });
+    if (!moved) break;
+  }
+  R.forEach(r => { r.e.style.left = r.x + "px"; r.e.style.top = r.y + "px"; r.e.style.width = r.w + "px"; r.e.style.height = r.h + "px"; fitLabelFont(r.e); });
+}
+function showAllLabels() {
+  hideLabels(); hideTip();
+  (PAGES[cur].buttons).forEach(z => addLabel(z[0], z[1], z[2], z[3], shortText(z)));
+  resolveLabelOverlaps();
+  panel.classList.add("labels-on");
+  labelsTimer = setTimeout(hideLabels, 6000);
+}
+panel.addEventListener("pointerup", e => {
+  if (PICK || CROPSET || (e.pointerType === "mouse" && e.button !== 0) || e.target.closest("button.z")) return;
+  if (panel.querySelector(".hmi-label")) hideLabels(); else showAllLabels();
+});
+
+/* ===== ساعت زنده: روی عکسِ ساعت می‌نشیند و هر ثانیه با ساعت واقعی به‌روز می‌شود ===== */
+const CLOCKS = { "layout": [637, 67, 175, 44, 33, "time", "#fff", 572], "setup-time": [147, 212, 710, 65, 32, "long", "#fff", 129] };   /* آخرین عدد: ستون خالی عکس که پشت ساعت کشیده می‌شود */
+let clockEl = null;
+const p2 = n => String(n).padStart(2, "0");
+function clockText(kind) {
+  const d = new Date(), yr = d.getFullYear();
+  if (kind === "time") return p2(d.getHours()) + ":" + p2(d.getMinutes()) + ":" + p2(d.getSeconds());
+  const date = p2(d.getDate()) + "/" + p2(d.getMonth() + 1) + "/" + (kind === "long" ? yr : String(yr).slice(2));
+  const time = p2(d.getHours()) + ":" + p2(d.getMinutes()) + ":" + p2(d.getSeconds());
+  return kind === "long" ? date + "   " + d.toLocaleDateString("en-GB", { weekday: "short" }) + "   " + time : date + " " + time;
+}
+function placeClock() {
+  if (clockEl) { clockEl.remove(); clockEl = null; }
+  const c = CLOCKS[cur]; if (!c || !panelImage.naturalWidth) return;
+  const pw = 6, sx = c[2] / pw, ihU = panelImage.offsetHeight;   /* پشت ساعت: یک نوار خالی کنار ساعت از همین عکس، تا ساعت قدیمی پنهان شود و ظاهرش مثل عکس بماند */
+  clockEl = document.createElement("div"); clockEl.id = "liveClock";
+  clockEl.style.cssText += "left:" + c[0] + "px;top:" + c[1] + "px;width:" + c[2] + "px;height:" + c[3] + "px;font-size:" + c[4] + "px;color:" + c[6] +
+    ";background-image:url('" + panelImage.src + "');background-repeat:no-repeat;background-size:" + (1000 * sx) + "px " + ihU + "px;background-position:" + (-c[7] * sx) + "px " + (-c[1]) + "px";
+  clockEl.textContent = clockText(c[5]); panel.appendChild(clockEl);
+}
+setInterval(() => { if (clockEl && CLOCKS[cur]) clockEl.textContent = clockText(CLOCKS[cur][5]); }, 1000);
+panel.addEventListener("pointerdown", e => { if (!e.target.closest("button.z")) { armed = null; clearTimeout(autoT); hideTip(); } });
+function endTouch(e) { if (e.pointerType === "mouse" || !touching) return; touching = false; clearTimeout(hideT); hideT = setTimeout(hideTip, 3000); }   /* بعد از برداشتن انگشت ۳ ثانیه می‌ماند */
+document.addEventListener("pointerup", endTouch, true); document.addEventListener("pointercancel", endTouch, true);
+panel.addEventListener("contextmenu", e => e.preventDefault());
+
+/* ===== برش دستی (کراپ): فقط این بخش از عکس نشان داده می‌شود. مختصات روی عکس ۱۰۰۰ پیکسلی: [x, y, عرض, ارتفاع]
+   - برای همه صفحه‌ها: DEFAULT_CROP را پر کن، مثل { x: 88, y: 26, w: 820, h: 600 }
+   - فقط برای یک صفحه: داخل همان صفحه در PAGES بنویس  crop: [x, y, عرض, ارتفاع]
+   - آزمایش سریع بدون ویرایش کد: آدرس را با  ?crop=88,26,820,600  باز کن
+   - پیدا کردن مختصات: آدرس را با  ?cropset  باز کن (صفحه دیگر را با #اسم-صفحه بده، مثل ?cropset#main-menu)، دو گوشه صفحه نمایش را کلیک کن */
+const DEFAULT_CROP = null;
+const AUTO_CROP = false;   /* عکس‌ها از قبل برش خورده‌اند؛ true کنی کد خودش قاب مشکی را پیدا می‌کند */
+const MAX_SCALE = 0.8;   /* بیشترین بزرگ‌نمایی: ۱ = اندازه اصلی (۱۰۰۰ پیکسل عرض)؛ ۰٫۸ = ۸۰٪ آن؛ هر چه کمتر، کوچک‌تر */
+const CROPSET = /[?&]cropset\b/.test(location.search);
+const CROPQ = (() => { const m = location.search.match(/[?&]crop=([\d.]+),([\d.]+),([\d.]+),([\d.]+)/); return m ? { x: +m[1], y: +m[2], w: +m[3], h: +m[4] } : null; })();
+let crop = null;
+function detectCrop() {   /* قاب سیاه و حاشیه عکس را پیدا می‌کند تا فقط خود صفحه نمایش دیده شود (اگر مرورگر اجازه خواندن عکس ندهد، کراپ نمی‌شود) */
+  const W = panelImage.naturalWidth, H = panelImage.naturalHeight; if (!W || !H) return null;
+  try {
+    const cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+    const g = cv.getContext("2d"); g.drawImage(panelImage, 0, 0);
+    const row = g.getImageData(0, H >> 1, W, 1).data, col = g.getImageData(W >> 1, 0, 1, H).data;
+    const L = (a, i) => 0.299 * a[i * 4] + 0.587 * a[i * 4 + 1] + 0.114 * a[i * 4 + 2];
+    const inner = (a, n, rev) => {   /* اولین نوار تیره (قاب) نزدیک لبه؛ بعد از آن شروع صفحه نمایش است */
+      const lim = Math.floor(n * 0.14); let run = 0;
+      for (let t = 0; t < lim; t++) {
+        const i = rev ? n - 1 - t : t;
+        if (L(a, i) < 45) run++;
+        else if (run >= 8) return t + 1;
+        else run = 0;
+      }
+      return 0;
+    };
+    const l = inner(row, W, false), r = inner(row, W, true), t = inner(col, H, false), b = inner(col, H, true), k = 1000 / W;
+    if (!l && !r && !t && !b) return null;
+    return { x: l * k, y: t * k, w: (W - l - r) * k, h: (H - t - b) * k };
+  } catch (er) { return null; }
+}
+function fitPanel() {
+  const land = matchMedia("(orientation: landscape)").matches, sc = screen, sMax = Math.max(sc.width || 0, sc.height || 0), sMin = Math.min(sc.width || 0, sc.height || 0);
+  const vw = Math.min(innerWidth, (land ? sMax : sMin) || innerWidth), vh = innerHeight, ih = panelImage.offsetHeight || 625;
+  const cr = crop || { x: 0, y: 0, w: 1000, h: ih };
+  const s = Math.min(vw / cr.w, vh / cr.h, MAX_SCALE);   /* به بالا سمت چپ می‌چسبد */
+  panel.style.transform = "scale(" + s + ") translate(" + (-cr.x) + "px," + (-cr.y) + "px)";
+  panel.style.marginLeft = "0px";
+  const fw = document.getElementById("fitWrap"); fw.style.width = Math.floor(cr.w * s) + "px"; fw.style.height = Math.ceil(cr.h * s) + "px";
+}
+addEventListener("resize", () => { fitPanel(); hideTip(); });
+addEventListener("orientationchange", () => { fitPanel(); setTimeout(fitPanel, 300); });
+panelImage.addEventListener("load", () => {
+  const pc = PAGES[cur].crop;
+  crop = CROPSET ? null : pc ? { x: pc[0], y: pc[1], w: pc[2], h: pc[3] } : (CROPQ || (DEFAULT_CROP && { ...DEFAULT_CROP }) || (AUTO_CROP ? detectCrop() : null));
+  fitPanel(); placeClock();
+});
+if (CROPSET) {
+  const cb = document.getElementById("coordBox"); cb.style.display = "block"; panel.classList.add("pick");
+  cb.textContent = "گوشه بالا چپ صفحه نمایش را کلیک کن"; let c1 = null;
+  panel.addEventListener("click", e => {
+    const r = panel.getBoundingClientRect(), k = 1000 / r.width, a = [Math.round((e.clientX - r.left) * k), Math.round((e.clientY - r.top) * k)];
+    if (!c1) { c1 = a; crop = null; fitPanel(); cb.textContent = "گوشه اول: " + a.join(", ") + "\nحالا گوشه پایین راست را کلیک کن"; return; }
+    const x = Math.min(c1[0], a[0]), y = Math.min(c1[1], a[1]), w = Math.abs(a[0] - c1[0]), h = Math.abs(a[1] - c1[1]); c1 = null;
+    crop = { x, y, w, h }; fitPanel();
+    cb.textContent = "crop: [" + [x, y, w, h].join(", ") + "]\nیا آدرس: ?crop=" + [x, y, w, h].join(",") + "\n(دوباره کلیک کن تا از نو انتخاب کنی)";
+  });
+}
+
+if (SHOW_BUTTONS) {
+  panel.classList.add("debug-on"); if (PICK) panel.classList.add("pick");
+  const cb = document.getElementById("coordBox"); cb.style.display = "block"; cb.textContent = "x: -  y: -";
+  const xy = e => { const r = panel.getBoundingClientRect(), k = 1000 / r.width; return [Math.round((e.clientX - r.left) * k), Math.round((e.clientY - r.top) * k)]; };
+  panel.addEventListener("pointermove", e => { if (!p1) { const a = xy(e); cb.textContent = "x: " + a[0] + "   y: " + a[1]; } });
+  if (PICK) panel.addEventListener("click", e => {
+    const a = xy(e);
+    if (!p1) { p1 = a; cb.textContent = "گوشه اول: " + a[0] + ", " + a[1] + "\nحالا گوشه مقابل را کلیک کن"; return; }
+    const line = "[" + Math.min(p1[0], a[0]) + ", " + Math.min(p1[1], a[1]) + ", " + Math.abs(a[0] - p1[0]) + ", " + Math.abs(a[1] - p1[1]) + ', "name", "توضیح فارسی", "page"],';
+    p1 = null; cb.textContent = line + "\n(کپی شد؛ داخل buttons همین صفحه بچسبان)";
+    try { navigator.clipboard.writeText(line).catch(() => {}); } catch (er) {}
+  });
+}
+/* نشان دادن لمس: هر جای صفحه که لمس یا کلیک شود، یک حلقه‌ی کوچک همان‌جا دیده می‌شود (جاهایی که دکمه ندارند فقط همین را نشان می‌دهند و وارد عکس دیگر نمی‌شوند) */
+document.addEventListener("pointerdown", e => {
+  if (e.pointerType === "mouse" && e.button !== 0) return;
+  const d = document.createElement("div"); d.className = "tap"; d.style.left = e.clientX + "px"; d.style.top = e.clientY + "px";
+  document.body.appendChild(d); setTimeout(() => d.remove(), 700);
+}, true);
+
+render(PAGES[location.hash.slice(1)] ? location.hash.slice(1) : "layout");
+</script>
+</body>
+</html>
