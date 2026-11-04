@@ -6,6 +6,27 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>HMI Stacker</title>
 <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet" media="print" onload="this.media='all'">
+<script>
+/* ===== قفل رمز (Password gate) =====
+   رمز داخل فایل نیست؛ فقط هش SHA-256 آن (HASH) ذخیره شده.
+   برای عوض‌کردن رمز: در کنسول مرورگر این را اجرا کن و خروجی را جای HASH بگذار:
+   crypto.subtle.digest("SHA-256", new TextEncoder().encode("stacker-panel|رمزجدید با حروف کوچک")).then(b=>console.log([...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("")))
+*/
+var SP_SALT="stacker-panel|", SP_HASH="0d9afe01e4adc63bafddaa603ad5714ed02c4e6b160729e8c714609a55718e81";
+(function(){try{if(localStorage.getItem("sp_ok")===SP_HASH)return}catch(e){}document.documentElement.className+=" locked"})();
+</script>
+<style>
+html.locked body>*:not(#gate){display:none!important}
+#gate{display:none;position:fixed;inset:0;z-index:99999;background:#1b2128;align-items:center;justify-content:center;font-family:Vazirmatn,Tahoma,Arial,sans-serif;direction:rtl}
+html.locked #gate{display:flex}
+#gate .box{width:min(88vw,340px);padding:26px 22px;border-radius:16px;background:#242c35;border:1px solid rgba(101,200,232,.5);box-shadow:0 10px 40px rgba(0,0,0,.6);text-align:center;color:#e8eef3}
+#gate h1{margin:0 0 6px;font-size:20px;color:#65c8e8}
+#gate p{margin:0 0 16px;font-size:14px;color:#9fb3c0}
+#gate input{width:100%;box-sizing:border-box;padding:12px;font-size:18px;text-align:center;border-radius:10px;border:1px solid #4a5866;background:#151a20;color:#fff;direction:ltr;outline:none}
+#gate input:focus{border-color:#65c8e8}
+#gate button{margin-top:12px;width:100%;padding:12px;font-size:17px;font-weight:700;border:0;border-radius:10px;background:#65c8e8;color:#10202a;cursor:pointer}
+#gate .err{min-height:20px;margin-top:10px;font-size:14px;color:#ff7b7b}
+</style>
 <style>
 html{margin:0;padding:0}body{margin:0;padding:0;background:#222;overflow-x:hidden;font-family:Vazirmatn,Tahoma,Arial,sans-serif}
 .panel{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;position:relative;display:block;width:1000px;margin:0;padding:0;transform-origin:0 0;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
@@ -32,6 +53,36 @@ button.z{position:absolute;padding:0;cursor:pointer;z-index:50;font-family:inher
 </style>
 </head>
 <body>
+<div id="gate"><div class="box">
+<h1>HMI Stacker</h1><p>رمز عبور را وارد کنید</p>
+<input id="gatePw" type="password" autocomplete="current-password" placeholder="Password" autocapitalize="off" autocorrect="off" spellcheck="false">
+<button id="gateBtn" type="button">ورود</button><div class="err" id="gateErr"></div>
+</div></div>
+<script>
+(function(){
+function sha256js(m){function r(n,x){return(x>>>n)|(x<<(32-n))}
+var K=[],H=[],i,j,p=0,c={};for(var n=2;p<64;n++){if(!c[n]){for(i=n*n;i<313;i+=n)c[i]=1;K[p]=(Math.pow(n,1/3)*4294967296)|0;H[p++]=(Math.pow(n,.5)*4294967296)|0}}
+H=H.slice(0,8);var b=[],l=m.length*8;for(i=0;i<(((l+64)>>9)<<4)+16;i++)b[i]=0;for(i=0;i<m.length;i++)b[i>>2]|=m[i]<<(24-(i%4)*8);
+b[l>>5]|=0x80<<(24-l%32);b[(((l+64)>>9)<<4)+15]=l;
+for(i=0;i<b.length;i+=16){var w=b.slice(i,i+16),a=H.slice(0);
+for(j=16;j<64;j++){var s0=r(7,w[j-15])^r(18,w[j-15])^(w[j-15]>>>3),s1=r(17,w[j-2])^r(19,w[j-2])^(w[j-2]>>>10);w[j]=(w[j-16]+s0+w[j-7]+s1)|0}
+for(j=0;j<64;j++){var S1=r(6,a[4])^r(11,a[4])^r(25,a[4]),ch=(a[4]&a[5])^(~a[4]&a[6]),t1=(a[7]+S1+ch+K[j]+w[j])|0,S0=r(2,a[0])^r(13,a[0])^r(22,a[0]),mj=(a[0]&a[1])^(a[0]&a[2])^(a[1]&a[2]),t2=(S0+mj)|0;
+a=[(t1+t2)|0,a[0],a[1],a[2],(a[3]+t1)|0,a[4],a[5],a[6]]}
+for(j=0;j<8;j++)H[j]=(H[j]+a[j])|0}
+return H.map(function(x){return("00000000"+(x>>>0).toString(16)).slice(-8)}).join("")}
+function utf8(s){return Array.prototype.slice.call(unescape(encodeURIComponent(s))).map(function(c){return c.charCodeAt(0)})}
+function hash(pw){var bytes=utf8(SP_SALT+pw);
+if(window.crypto&&crypto.subtle&&window.TextEncoder){return crypto.subtle.digest("SHA-256",new Uint8Array(bytes)).then(function(d){return Array.prototype.map.call(new Uint8Array(d),function(x){return("0"+x.toString(16)).slice(-2)}).join("")})}
+return Promise.resolve(sha256js(bytes))}
+var inp=document.getElementById("gatePw"),err=document.getElementById("gateErr"),busy=false;
+function tryIt(){if(busy)return;busy=true;err.textContent="";
+hash(inp.value.trim().toLowerCase()).then(function(h){
+if(h===SP_HASH){try{localStorage.setItem("sp_ok",h)}catch(e){}document.documentElement.classList.remove("locked");inp.value="";window.dispatchEvent(new Event("resize"));busy=false}
+else{setTimeout(function(){err.textContent="رمز اشتباه است";inp.select();busy=false},800)}})}
+document.getElementById("gateBtn").addEventListener("click",tryIt);
+inp.addEventListener("keydown",function(e){if(e.key==="Enter")tryIt()});
+})();
+</script>
 <div id="fitWrap" style="width:100%;margin:0;padding:0;overflow:hidden;line-height:0">
 <div class="panel" id="panel"><img id="panelImage" alt="HMI Stacker"></div>
 </div>
