@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="google" content="notranslate">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#1b2128">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="images/icon-192.png">
+<link rel="apple-touch-icon" href="images/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="HMI Stacker">
 <title>HMI Stacker</title>
 <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet" media="print" onload="this.media='all'">
 <script>
@@ -13,7 +20,9 @@
    crypto.subtle.digest("SHA-256", new TextEncoder().encode("stacker-panel|رمزجدید با حروف کوچک")).then(b=>console.log([...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("")))
 */
 var SP_SALT="stacker-panel|", SP_HASH="0d9afe01e4adc63bafddaa603ad5714ed02c4e6b160729e8c714609a55718e81";
-(function(){try{if(localStorage.getItem("sp_ok")===SP_HASH)return}catch(e){}document.documentElement.className+=" locked"})();
+/* قفل فقط وقتی سایت از github.io باز شود فعال است؛ روی لپ‌تاپ (فایل محلی / localhost) رمز نمی‌خواهد */
+var SP_NEEDS_PW=/(^|\.)github\.io$/i.test(location.hostname);
+(function(){if(!SP_NEEDS_PW)return;try{if(localStorage.getItem("sp_ok")===SP_HASH)return}catch(e){}document.documentElement.className+=" locked"})();
 </script>
 <style>
 html.locked body>*:not(#gate){display:none!important}
@@ -28,7 +37,7 @@ html.locked #gate{display:flex}
 #gate .err{min-height:20px;margin-top:10px;font-size:14px;color:#ff7b7b}
 </style>
 <style>
-html{margin:0;padding:0}body{margin:0;padding:0;background:#222;overflow-x:hidden;font-family:Vazirmatn,Tahoma,Arial,sans-serif}
+html{margin:0;padding:0;-webkit-text-size-adjust:100%;text-size-adjust:100%}body{margin:0;padding:0;background:#222;overflow-x:hidden;font-family:Vazirmatn,Tahoma,Arial,sans-serif}
 .panel{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;position:relative;display:block;width:1000px;margin:0;padding:0;transform-origin:0 0;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 .panel img{width:1000px;display:block}
 button.z{position:absolute;padding:0;cursor:pointer;z-index:50;font-family:inherit;box-sizing:border-box;background:transparent!important;border:none!important;color:transparent!important;font-size:0!important;box-shadow:none!important;outline:none!important}
@@ -47,7 +56,7 @@ button.z{position:absolute;padding:0;cursor:pointer;z-index:50;font-family:inher
 .hmi-tooltip-title{display:block;color:#65c8e8;font-weight:800;font-size:18px;margin-bottom:6px;padding-bottom:5px;border-bottom:1px solid rgba(101,200,232,.3);direction:ltr;text-align:left;overflow-wrap:anywhere;letter-spacing:.5px}
 .hmi-tooltip-text{display:block;color:#e8eef3;font-size:16px;font-weight:600;line-height:1.7;overflow-wrap:anywhere}
 .hmi-tooltip-hint{display:block;margin-top:6px;color:#9fb3c0;font-size:13px}
-@media (max-width:600px){.hmi-tooltip{width:200px;padding:7px 10px;font-size:13.5px;line-height:1.5;border-radius:10px}.hmi-tooltip.wide{width:300px}.hmi-tooltip-title{font-size:14.5px;margin-bottom:4px;padding-bottom:4px}.hmi-tooltip-text{font-size:13.5px;line-height:1.55}.hmi-tooltip-hint{font-size:11.5px}}
+@media (max-width:600px){.hmi-tooltip{width:170px;padding:6px 9px;font-size:11.5px;line-height:1.45;border-radius:9px}.hmi-tooltip.wide{width:260px}.hmi-tooltip-title{font-size:12.5px;margin-bottom:3px;padding-bottom:3px}.hmi-tooltip-text{font-size:11.5px;line-height:1.5;font-weight:500}.hmi-tooltip-hint{font-size:10px}}
 .tap{position:fixed;width:46px;height:46px;margin:-23px 0 0 -23px;border-radius:50%;border:3px solid #65c8e8;background:rgba(101,200,232,.35);box-shadow:0 0 12px rgba(101,200,232,.6);pointer-events:none;z-index:6000;animation:tapPulse .65s ease-out forwards}
 @keyframes tapPulse{from{transform:scale(.4);opacity:1}to{transform:scale(1.7);opacity:0}}
 </style>
@@ -885,6 +894,10 @@ document.addEventListener("pointerdown", e => {
 }, true);
 
 render(PAGES[location.hash.slice(1)] ? location.hash.slice(1) : "layout");
+
+if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {
+  addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+}
 </script>
 </body>
 </html>
