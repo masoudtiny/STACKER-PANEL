@@ -10,8 +10,8 @@
 <link rel="apple-touch-icon" href="images/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="HMI Stacker">
-<title>HMI Stacker</title>
+<meta name="apple-mobile-web-app-title" content="HMI-STACKER">
+<title>HMI-STACKER</title>
 <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet" media="print" onload="this.media='all'">
 <script>
 /* ===== قفل رمز (Password gate) =====
@@ -29,7 +29,7 @@ html.locked body>*:not(#gate){display:none!important}
 #gate{display:none;position:fixed;inset:0;z-index:99999;background:#1b2128;align-items:center;justify-content:center;font-family:Vazirmatn,Tahoma,Arial,sans-serif;direction:rtl}
 html.locked #gate{display:flex}
 #gate .box{width:min(88vw,340px);padding:26px 22px;border-radius:16px;background:#242c35;border:1px solid rgba(101,200,232,.5);box-shadow:0 10px 40px rgba(0,0,0,.6);text-align:center;color:#e8eef3}
-#gate h1{margin:0 0 6px;font-size:20px;color:#65c8e8}
+#gate h1{margin:0 0 6px;font-size:24px;font-weight:800;letter-spacing:1px;color:#65c8e8;direction:ltr}
 #gate p{margin:0 0 16px;font-size:14px;color:#9fb3c0}
 #gate input{width:100%;box-sizing:border-box;padding:12px;font-size:18px;text-align:center;border-radius:10px;border:1px solid #4a5866;background:#151a20;color:#fff;direction:ltr;outline:none}
 #gate input:focus{border-color:#65c8e8}
@@ -48,7 +48,7 @@ button.z{position:absolute;padding:0;cursor:pointer;z-index:50;font-family:inher
 .hmi-label{white-space:pre-line;position:absolute;box-sizing:border-box;display:flex;align-items:center;justify-content:center;text-align:center;direction:rtl;overflow:hidden;padding:1px 3px;background:none;border:0;color:#fff;-webkit-text-stroke:3px #000;paint-order:stroke fill;text-shadow:0 0 3px #000,0 0 3px #000,1px 1px 2px #000,-1px -1px 2px #000;font-family:Vazirmatn,Tahoma,Arial,sans-serif;font-weight:700;line-height:1.2;z-index:300;pointer-events:none}
 .pick .hmi-label{display:none}
 #liveClock{position:absolute;z-index:40;pointer-events:none;box-sizing:border-box;display:flex;align-items:center;justify-content:center;white-space:nowrap;font-family:Consolas,Menlo,monospace;font-weight:600;letter-spacing:.5px;direction:ltr}
-.panel.labels-on #liveClock{opacity:0}
+.panel.labels-on #liveClock{filter:blur(2.5px) brightness(1.2) opacity(.2);transition:filter .15s}
 #coordBox{display:none;position:fixed;top:6px;right:6px;z-index:5000;background:#000;color:#3f3;font:14px monospace;padding:6px 10px;border:1px solid #3f3;border-radius:6px;pointer-events:none;max-width:90vw;direction:ltr;white-space:pre-wrap}
 #msg{display:none;position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:3000;background:rgba(30,37,44,.95);color:#f1f5f8;border:1px solid rgba(101,200,232,.6);border-radius:10px;padding:8px 14px;font-size:13px;max-width:90vw;direction:rtl;text-align:center}
 .hmi-tooltip{position:fixed;display:none;width:250px;max-width:calc(100vw - 10px);box-sizing:border-box;padding:10px 14px;background:rgba(30,37,44,.88);color:#f1f5f8;border:1px solid rgba(101,200,232,.6);border-radius:12px;direction:rtl;text-align:right;font-family:Vazirmatn,Tahoma,Arial,sans-serif;font-size:17px;line-height:1.6;box-shadow:0 10px 30px rgba(0,0,0,.6),0 0 15px rgba(101,200,232,.15);z-index:2000;pointer-events:none;white-space:pre-line;backdrop-filter:blur(8px)}
@@ -67,7 +67,7 @@ button.z{position:absolute;padding:0;cursor:pointer;z-index:50;font-family:inher
 </head>
 <body>
 <div id="gate"><div class="box">
-<img src="images/logo.png" alt="" onerror="this.style.display='none'" style="width:70%;max-width:220px;height:auto;margin:0 auto 12px;display:block"><h1>HMI Stacker</h1><p>رمز عبور را وارد کنید</p>
+<img src="images/logo.png" alt="" onerror="this.style.display='none'" style="width:70%;max-width:220px;height:auto;margin:0 auto 12px;display:block"><h1>STACKER-PANEL</h1><p>رمز عبور را وارد کنید</p>
 <input id="gatePw" type="password" autocomplete="current-password" placeholder="Password" autocapitalize="off" autocorrect="off" spellcheck="false">
 <button id="gateBtn" type="button">ورود</button><div class="err" id="gateErr"></div>
 </div></div>
@@ -128,7 +128,7 @@ const PAGES = {
     [20, 230, 965, 245, "Machine layout", "شمای ساده‌شده استکر و بگرها؛ قسمت‌های روشن یا رنگی وضعیت بخش‌ها را نشان می‌دهند."],
     [0, 478, 200, 42, "Level: 0", "سطح دسترسی کاربر ورودی (۰ یعنی کسی وارد نشده) و علامت قفل."],
     [375, 485, 85, 30, "User", "نام کاربری که وارد شده است."],
-    [662, 485, 328, 30, "Actual Speed", "سرعت واقعی فعلی دستگاه (مثلاً ۸۳۵)."],
+    [662, 485, 328, 30, "Actual Speed", "سرعت واقعی فعلی دستگاه."],
     [0, 522, 998, 146, "Alarm message", "بخش پیام آلارم: فقط چند آلارم فعال را (شماره و متن) نشان می‌دهد؛ برای دیدن همه آلارم‌ها از منوی اصلی، «Alarms on» را بزن."],
     [890, 672, 100, 47, "Square button", "دکمه مربع: رفتن به منوی اصلی.", "main-menu"],
     [0, 672, 200, 47, "Back", "دکمه بازگشت به صفحه قبل", "$back"],
@@ -615,11 +615,11 @@ const PAGES = {
     [43, 68, 301, 27, "Servomotors current", "جریان سروموتورهای زنجیر پره‌های استکر (آمپر)."],
     [640, 68, 127, 27, "Detected", "مقدار جریان اندازه‌گیری‌شده توسط دستگاه."],
     [37, 99, 476, 44, "Paddle chain IN (A)", "جریان سروموتور زنجیر پره‌های استکر ورودی (آمپر)."],
-    [524, 99, 108, 44, "Value IN", "مقدار تنظیم‌شده جریان زنجیر ورودی (مثلاً ۶٫۶)."],
-    [645, 99, 109, 44, "Detected IN", "مقدار اندازه‌گیری‌شده جریان زنجیر ورودی (مثلاً ۵٫۰)."],
+    [524, 99, 108, 44, "Value IN", "مقدار تنظیم‌شده جریان زنجیر ورودی."],
+    [645, 99, 109, 44, "Detected IN", "مقدار اندازه‌گیری‌شده جریان زنجیر ورودی."],
     [37, 149, 476, 44, "Paddlechain OUT (A)", "جریان سروموتور زنجیر پره‌های استکر خروجی (آمپر)."],
-    [524, 149, 108, 44, "Value OUT", "مقدار تنظیم‌شده جریان زنجیر خروجی (مثلاً ۶٫۷)."],
-    [645, 149, 109, 44, "Detected OUT", "مقدار اندازه‌گیری‌شده جریان زنجیر خروجی (مثلاً ۶٫۸)."],
+    [524, 149, 108, 44, "Value OUT", "مقدار تنظیم‌شده جریان زنجیر خروجی."],
+    [645, 149, 109, 44, "Detected OUT", "مقدار اندازه‌گیری‌شده جریان زنجیر خروجی."],
     [773, 237, 190, 90, "CONFIRM DATA", "تأیید داده‌ها: مقدارهای این بخش را تأیید می‌کند."],
     [534, 361, 75, 30, "CODE", "کد وضعیت یا خطای درایو."],
     [660, 361, 77, 30, "POS.", "موقعیت فعلی موتور."],
@@ -803,13 +803,35 @@ function clockText(kind) {
   const time = p2(d.getHours()) + ":" + p2(d.getMinutes()) + ":" + p2(d.getSeconds());
   return kind === "long" ? date + "   " + d.toLocaleDateString("en-GB", { weekday: "short" }) + "   " + time : date + " " + time;
 }
+function coverFor(c) {
+  /* پشت ساعت را از رنگ‌های واقعی دو طرف ساعت در همین عکس می‌سازد (هر ردیف یک گرادیان)، تا هیچ رقم قدیمی دیده نشود */
+  try {
+    const k = panelImage.naturalWidth / 1000, pad = 4;
+    const x0 = Math.max(0, Math.round((c[0] - pad - 4) * k)), x1 = Math.min(panelImage.naturalWidth - 3, Math.round((c[0] + c[2] + pad + 2) * k));
+    const y0 = Math.round((c[1] - pad) * k), h = Math.round((c[3] + 2 * pad) * k);
+    const cv = document.createElement("canvas"); cv.width = panelImage.naturalWidth; cv.height = h; const cx = cv.getContext("2d");
+    cx.drawImage(panelImage, 0, y0, panelImage.naturalWidth, h, 0, 0, panelImage.naturalWidth, h);
+    const L = cx.getImageData(x0, 0, 3, h).data, R = cx.getImageData(x1, 0, 3, h).data;
+    const o = document.createElement("canvas"); o.width = 64; o.height = h; const ox = o.getContext("2d");
+    for (let y = 0; y < h; y++) {
+      let a = [0, 0, 0], b = [0, 0, 0];
+      for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) { a[j] += L[(y * 3 + i) * 4 + j] / 3; b[j] += R[(y * 3 + i) * 4 + j] / 3; }
+      const g = ox.createLinearGradient(0, 0, 64, 0);
+      g.addColorStop(0, "rgb(" + a.map(Math.round) + ")"); g.addColorStop(1, "rgb(" + b.map(Math.round) + ")");
+      ox.fillStyle = g; ox.fillRect(0, y, 64, 1);
+    }
+    return o.toDataURL();
+  } catch (e) { return null; }
+}
 function placeClock() {
   if (clockEl) { clockEl.remove(); clockEl = null; }
   const c = CLOCKS[cur]; if (!c || !panelImage.naturalWidth) return;
-  const pw = 6, sx = c[2] / pw, ihU = panelImage.offsetHeight;   /* پشت ساعت: یک نوار خالی کنار ساعت از همین عکس، تا ساعت قدیمی پنهان شود و ظاهرش مثل عکس بماند */
+  const pad = 4, pw = 6, sx = c[2] / pw, ihU = panelImage.offsetHeight, cover = coverFor(c);
   clockEl = document.createElement("div"); clockEl.id = "liveClock";
-  clockEl.style.cssText += "left:" + c[0] + "px;top:" + c[1] + "px;width:" + c[2] + "px;height:" + c[3] + "px;font-size:" + c[4] + "px;color:" + c[6] +
-    ";background-image:url('" + panelImage.src + "');background-repeat:no-repeat;background-size:" + (1000 * sx) + "px " + ihU + "px;background-position:" + (-c[7] * sx) + "px " + (-c[1]) + "px";
+  let bg;
+  if (cover) bg = ";background:url('" + cover + "') 0 0/100% 100% no-repeat";
+  else bg = ";background-image:url('" + panelImage.src + "');background-repeat:no-repeat;background-size:" + (1000 * sx) + "px " + ihU + "px;background-position:" + (-c[7] * sx) + "px " + (-(c[1] - pad)) + "px";
+  clockEl.style.cssText += "left:" + (c[0] - pad) + "px;top:" + (c[1] - pad) + "px;width:" + (c[2] + 2 * pad) + "px;height:" + (c[3] + 2 * pad) + "px;font-size:" + c[4] + "px;color:" + c[6] + bg;
   clockEl.textContent = clockText(c[5]); panel.appendChild(clockEl);
 }
 setInterval(() => { if (clockEl && CLOCKS[cur]) clockEl.textContent = clockText(CLOCKS[cur][5]); }, 1000);
@@ -907,7 +929,7 @@ if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {
 
 (function(){
   var ib=document.getElementById("installBtn"),dp=null;
-  var standalone=matchMedia("(display-mode: standalone)").matches||navigator.standalone;
+  var standalone=matchMedia("(display-mode: standalone)").matches||matchMedia("(display-mode: fullscreen)").matches||navigator.standalone;
   if(standalone)return;
   addEventListener("beforeinstallprompt",function(e){e.preventDefault();dp=e;ib.style.display="inline-block"});
   addEventListener("appinstalled",function(){ib.style.display="none"});
