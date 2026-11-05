@@ -847,6 +847,7 @@ panel.addEventListener("contextmenu", e => e.preventDefault());
    - پیدا کردن مختصات: آدرس را با  ?cropset  باز کن (صفحه دیگر را با #اسم-صفحه بده، مثل ?cropset#main-menu)، دو گوشه صفحه نمایش را کلیک کن */
 const DEFAULT_CROP = null;
 const AUTO_CROP = false;   /* عکس‌ها از قبل برش خورده‌اند؛ true کنی کد خودش قاب مشکی را پیدا می‌کند */
+const FILL_WIDTH = true;   /* روی گوشی (حالت افقی) عرض پنل کل عرض گوشی را پر می‌کند؛ اگر ارتفاع کم بود، صفحه را با کشیدن انگشت به بالا و پایین ببرید. برای برگشت به حالت قبلی (کل پنل بدون اسکرول، کوچک‌تر) false بگذارید */
 const MAX_SCALE = 0.8;   /* بیشترین بزرگ‌نمایی: ۱ = اندازه اصلی (۱۰۰۰ پیکسل عرض)؛ ۰٫۸ = ۸۰٪ آن؛ هر چه کمتر، کوچک‌تر */
 const CROPSET = /[?&]cropset\b/.test(location.search);
 const CROPQ = (() => { const m = location.search.match(/[?&]crop=([\d.]+),([\d.]+),([\d.]+),([\d.]+)/); return m ? { x: +m[1], y: +m[2], w: +m[3], h: +m[4] } : null; })();
@@ -877,7 +878,7 @@ function fitPanel() {
   const land = matchMedia("(orientation: landscape)").matches, sc = screen, sMax = Math.max(sc.width || 0, sc.height || 0), sMin = Math.min(sc.width || 0, sc.height || 0);
   const vw = Math.min(innerWidth, (land ? sMax : sMin) || innerWidth), vh = innerHeight, ih = panelImage.offsetHeight || 625;
   const cr = crop || { x: 0, y: 0, w: 1000, h: ih };
-  const s = Math.min(vw / cr.w, vh / cr.h, MAX_SCALE);   /* به بالا سمت چپ می‌چسبد */
+  const s = (FILL_WIDTH && land && matchMedia("(pointer: coarse)").matches) ? vw / cr.w : Math.min(vw / cr.w, vh / cr.h, MAX_SCALE);   /* به بالا سمت چپ می‌چسبد */
   panel.style.transform = "scale(" + s + ") translate(" + (-cr.x) + "px," + (-cr.y) + "px)";
   panel.style.marginLeft = "0px";
   const fw = document.getElementById("fitWrap"); fw.style.width = Math.floor(cr.w * s) + "px"; fw.style.height = Math.ceil(cr.h * s) + "px";
