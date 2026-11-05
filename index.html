@@ -58,6 +58,8 @@ button.z{position:absolute;padding:0;cursor:pointer;z-index:50;font-family:inher
 .hmi-tooltip-hint{display:block;margin-top:6px;color:#9fb3c0;font-size:13px}
 @media (max-width:600px){.hmi-tooltip{width:170px;padding:6px 9px;font-size:11.5px;line-height:1.45;border-radius:9px}.hmi-tooltip.wide{width:260px}.hmi-tooltip-title{font-size:12.5px;margin-bottom:3px;padding-bottom:3px}.hmi-tooltip-text{font-size:11.5px;line-height:1.5;font-weight:500}.hmi-tooltip-hint{font-size:10px}}
 
+#bgBlur{display:none;position:fixed;inset:-30px;z-index:-1;background:center/cover no-repeat;filter:blur(22px) brightness(.6) saturate(1.1);pointer-events:none}
+@media (pointer:coarse) and (orientation:landscape){#bgBlur{display:block}}
 #topbar{position:fixed;top:6px;left:6px;z-index:1500;display:flex;gap:8px;align-items:center;pointer-events:none}
 #installBtn{display:none;pointer-events:auto;padding:6px 12px;font:700 13px Vazirmatn,Tahoma,sans-serif;border:0;border-radius:8px;background:#65c8e8;color:#10202a;cursor:pointer}
 #iosHint{display:none;position:fixed;left:8px;right:8px;bottom:8px;z-index:4000;padding:10px 12px;border-radius:10px;background:rgba(30,37,44,.96);color:#f1f5f8;border:1px solid rgba(101,200,232,.6);font:13px Vazirmatn,Tahoma,sans-serif;direction:rtl;text-align:center}
@@ -99,6 +101,7 @@ inp.addEventListener("keydown",function(e){if(e.key==="Enter")tryIt()});
 <div id="fitWrap" style="width:100%;margin:0;padding:0;overflow:hidden;line-height:0">
 <div class="panel" id="panel"><img id="panelImage" alt="HMI Stacker"></div>
 </div>
+<div id="bgBlur"></div>
 <div id="topbar"><button id="installBtn" type="button">نصب برنامه</button></div>
 <div id="iosHint">برای نصب: دکمه Share را بزن و «Add to Home Screen» را انتخاب کن.</div>
 <div id="coordBox"></div>
@@ -887,6 +890,7 @@ function fitPanel() {
 addEventListener("resize", () => { fitPanel(); hideTip(); });
 addEventListener("orientationchange", () => { fitPanel(); setTimeout(fitPanel, 300); });
 panelImage.addEventListener("load", () => {
+  try { document.getElementById("bgBlur").style.backgroundImage = "url(\"" + panelImage.src + "\")"; } catch (e) {}
   const pc = PAGES[cur].crop;
   crop = CROPSET ? null : pc ? { x: pc[0], y: pc[1], w: pc[2], h: pc[3] } : (CROPQ || (DEFAULT_CROP && { ...DEFAULT_CROP }) || (AUTO_CROP ? detectCrop() : null));
   fitPanel(); placeClock();
